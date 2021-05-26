@@ -1,40 +1,6 @@
 #!/home/nhatch2/miniconda3/bin/python3
 
 import numpy as np
-np.set_printoptions(precision=3, suppress=True)
-
-target = 'sim_data'
-X = np.loadtxt(target + '/np.txt')
-N = X.shape[0]
-seqs = []
-seq = []
-seq_no = 0
-for row in X:
-    data = row[1:].reshape((1,-1))
-    if row[0] != seq_no:
-        if len(seq) > 1:
-            seqs.append(seq)
-        seq = data
-        seq_no = row[0]
-    else:
-        seq = np.concatenate([seq, data], 0)
-
-N_SEQS = len(seqs)
-print("Found seqs:", N_SEQS)
-print("Of lengths:", list(map(lambda s: len(s), seqs)))
-D = 2
-train_N_SEQS = N_SEQS // 5 * 4
-test_N_SEQS = N_SEQS - train_N_SEQS
-assert(test_N_SEQS > 0)
-
-assert(seqs[0].shape[1] == 5)
-x_train = list(map(lambda s: s[:,:2], seqs[:train_N_SEQS]))
-y_train = list(map(lambda s: s[:,2:], seqs[:train_N_SEQS]))
-x_test = list(map(lambda s: s[:,:2], seqs[train_N_SEQS:]))
-y_test = list(map(lambda s: s[:,2:], seqs[train_N_SEQS:]))
-
-print("first train seq shape:", x_train[0].shape)
-print("first test seq shape:", x_test[0].shape)
 
 # We used to try to predict full 6D pose
 #WEIGHTS = np.array([10,10,10,100,100,100])
@@ -49,24 +15,21 @@ class LinearModel:
         self.w = None
         self.train_n_steps = None
 
-    def rollout_y_seq(self, yy, n_steps):
+    def relative_pose(self, query_pose, reference_pose):
+        diff = query_pose - reference_pose
+        distance = np.linalg.norm(diff[:,:2], axis=1)
+        direction = np.arctan2(diff[:,1], diff[:,0])
+        relative_direction = direction - reference_pose[:,2]
+        angle_diff = diff[:,2]
+        minimized_angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
+        return np.array([distance*np.cos(relative_direction),
+                         distance*np.sin(relative_direction),
+                         minimized_angle_diff]).T
+
+    def get_n_step_targets(self, yy, n_steps):
         assert(yy.shape[1] == 3)
         seq_len = len(yy) - n_steps
-        target_deltas = np.zeros_like(yy[:seq_len,:])
-        # Rather than just taking the difference between t and t+n_steps,
-        # we integrate over those n steps. This is just to make sure we
-        # get the correct angle difference (i.e. not off by k*2*pi).
-        for t in range(n_steps):
-            delta = yy[t+1:t+1+seq_len,:] - yy[t:t+seq_len,:]
-            world_delta = np.zeros_like(delta)
-            curr_angles = target_deltas[:,2]
-            world_delta[:,0] = np.cos(curr_angles) * delta[:,0] - np.sin(curr_angles) * delta[:,1]
-            world_delta[:,1] = np.sin(curr_angles) * delta[:,0] + np.cos(curr_angles) * delta[:,1]
-            # Column 2 is the angle
-            # Within one timestep we should use the smallest representation of the angle
-            world_delta[:,2] = np.arcsin(np.sin(delta[:,2]))
-            target_deltas += world_delta
-        return target_deltas
+        return self.relative_pose(yy[n_steps:,:], yy[:-n_steps,:])
 
     def concat_seqs(self, x_seqs, y_seqs, n_steps):
         n_seqs = len(x_seqs)
@@ -79,7 +42,7 @@ class LinearModel:
             seq_len = len(yy) - n_steps
             assert(len(xx) == len(yy))
             assert(xx.shape[1] == 2)
-            target_deltas = self.rollout_y_seq(yy, n_steps)
+            target_deltas = self.get_n_step_targets(yy, n_steps)
             # TODO if n_steps > 1, we should concatenate multiple commands together
             rollout_x_seqs.append(xx[:seq_len,:])
             rollout_y_seqs.append(target_deltas)
@@ -113,9 +76,8 @@ class LinearModel:
     def predict_one_steps(self, xx):
         return xx @ self.w
 
-    def predict_seq(self, xx, n_steps):
-        seq_len = len(xx) - n_steps
-        one_steps = self.predict_one_steps(xx[:-1,:])
+    def rollout_one_steps(self, one_steps, n_steps):
+        seq_len = len(one_steps) - n_steps + 1
         preds = np.zeros((seq_len, one_steps.shape[1]))
         for t in range(n_steps):
             curr_angles = preds[:,2]
@@ -128,6 +90,10 @@ class LinearModel:
             preds += world_summand
         return preds
 
+    def predict_seq(self, xx, n_steps):
+        one_steps = self.predict_one_steps(xx[:-1,:])
+        return self.rollout_one_steps(one_steps, n_steps)
+
     def evaluate(self, x_seqs, y_seqs, n_steps=1):
         n_seqs = len(x_seqs)
         assert(n_seqs == len(y_seqs))
@@ -137,8 +103,8 @@ class LinearModel:
         for s in range(n_seqs):
             pp = pred_seqs[s]
             yy = y_seqs[s]
-            rollout = self.rollout_y_seq(yy, n_steps)
-            weighted_diff = (rollout - pp) * WEIGHTS
+            targets = self.get_n_step_targets(yy, n_steps)
+            weighted_diff = (targets - pp) * WEIGHTS
             assert(weighted_diff.shape == pp.shape)
             errs = 0.5 * (weighted_diff * weighted_diff).sum(axis=1)
             assert(errs.shape == (yy.shape[0] - n_steps,))
@@ -164,24 +130,59 @@ class UnicycleModel(LinearModel):
         self.train_n_steps = 1
         self.w = np.array([[0.1, 0, 0], [0, 0, 0.1]])
 
+if __name__ == "__main__":
+    np.set_printoptions(precision=3, suppress=True)
 
-N_TRAIN_STEPS = 1
-N_EVAL_STEPS = 20
+    target = 'sim_data'
+    X = np.loadtxt(target + '/np.txt')
+    N = X.shape[0]
+    seqs = []
+    seq = []
+    seq_no = 0
+    for row in X:
+        data = row[1:].reshape((1,-1))
+        if row[0] != seq_no:
+            if len(seq) > 1:
+                seqs.append(seq)
+            seq = data
+            seq_no = row[0]
+        else:
+            seq = np.concatenate([seq, data], 0)
 
-model = MeanModel()
-model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
-print("Mean model:    ", score)
+    N_SEQS = len(seqs)
+    print("Found seqs:", N_SEQS)
+    print("Of lengths:", list(map(lambda s: len(s), seqs)))
+    D = 2
+    train_N_SEQS = N_SEQS // 5 * 4
+    test_N_SEQS = N_SEQS - train_N_SEQS
+    assert(test_N_SEQS > 0)
 
-model = UnicycleModel()
-model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
-print("Unicycle model:", score)
+    assert(seqs[0].shape[1] == 5)
+    x_train = list(map(lambda s: s[:,:2], seqs[:train_N_SEQS]))
+    y_train = list(map(lambda s: s[:,2:], seqs[:train_N_SEQS]))
+    x_test = list(map(lambda s: s[:,:2], seqs[train_N_SEQS:]))
+    y_test = list(map(lambda s: s[:,2:], seqs[train_N_SEQS:]))
 
-model = LinearModel()
-model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
-print("Linear model:  ", score)
+    print("first train seq shape:", x_train[0].shape)
+    print("first test seq shape:", x_test[0].shape)
 
-print("linear weights")
-print(model.w)
+    N_TRAIN_STEPS = 1
+    N_EVAL_STEPS = 20
+
+    model = MeanModel()
+    model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+    score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    print("Mean model:    ", score)
+
+    model = UnicycleModel()
+    model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+    score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    print("Unicycle model:", score)
+
+    model = LinearModel()
+    model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+    score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    print("Linear model:  ", score)
+
+    print("linear weights")
+    print(model.w)
