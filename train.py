@@ -164,19 +164,23 @@ class UnicycleModel(LinearModel):
         self.train_n_steps = 1
         self.w = np.array([[0.1, 0, 0], [0, 0, 0.1]])
 
+
+N_TRAIN_STEPS = 1
+N_EVAL_STEPS = 20
+
 model = MeanModel()
-model.train(x_train, y_train, n_steps=1)
-score = model.evaluate(x_test, y_test, n_steps=1)
+model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
 print("Mean model:    ", score)
 
 model = UnicycleModel()
-model.train(x_train, y_train, n_steps=1)
-score = model.evaluate(x_test, y_test, n_steps=1)
+model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
 print("Unicycle model:", score)
 
 model = LinearModel()
-model.train(x_train, y_train, n_steps=1)
-score = model.evaluate(x_test, y_test, n_steps=1)
+model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
 print("Linear model:  ", score)
 
 print("linear weights")
