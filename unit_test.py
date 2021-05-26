@@ -1,7 +1,7 @@
 #!/home/nhatch2/miniconda3/bin/python3
 
 import numpy as np
-from train import LinearModel
+from models import LinearModel
 
 model = LinearModel()
 
