@@ -2,9 +2,10 @@
 
 import numpy as np
 from models import *
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    np.set_printoptions(precision=3, suppress=True)
+    #np.set_printoptions(precision=3, suppress=True)
 
     target = 'sim_data'
     X = np.loadtxt(target + '/np.txt')
@@ -42,20 +43,34 @@ if __name__ == "__main__":
     N_TRAIN_STEPS = 1
     N_EVAL_STEPS = 20
 
-    model = MeanModel()
-    model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
-    print("Mean model:    ", score)
+    mean_model = MeanModel()
+    mean_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+    mean_score = mean_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    print("Mean model:    ", mean_score)
 
-    model = UnicycleModel()
-    model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
-    print("Unicycle model:", score)
+    uni_model = UnicycleModel()
+    uni_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+    uni_score = uni_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    print("Unicycle model:", uni_score)
 
-    model = LinearModel()
-    model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    score = model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
-    print("Linear model:  ", score)
+    linear_model = LinearModel()
+    linear_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
+    linear_score = linear_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    print("Linear model:  ", linear_score)
 
     print("linear weights")
-    print(model.w)
+    print(linear_model.w)
+
+    test_seq_no = 0
+    start_idx = 100
+    n_steps = 20
+    t_start = start_idx-20 if start_idx > 20 else 0
+    t_end = start_idx+n_steps+1
+    tx, ty, mx, my = linear_model.compare_qualitative(
+            x_test[test_seq_no], y_test[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+    _, _, umx, umy = uni_model.compare_qualitative(
+            x_test[test_seq_no], y_test[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+    plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black')
+    plt.plot(mx, my, color='blue')
+    plt.plot(umx, umy, color='red')
+    plt.savefig('out.png')
