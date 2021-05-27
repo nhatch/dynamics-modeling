@@ -104,7 +104,11 @@ class LinearModel:
             pp = pred_seqs[s]
             yy = y_seqs[s]
             targets = self.get_n_step_targets(yy, n_steps)
-            weighted_diff = (targets - pp) * WEIGHTS
+            #print(pp[:10,:])
+            #print()
+            #print(targets[:10,:])
+            #print()
+            weighted_diff = (targets - pp) * WEIGHTS / n_steps
             assert(weighted_diff.shape == pp.shape)
             errs = 0.5 * (weighted_diff * weighted_diff).sum(axis=1)
             assert(errs.shape == (yy.shape[0] - n_steps,))
