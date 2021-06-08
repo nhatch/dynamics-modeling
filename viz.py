@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 target = 'sim_data'
-X= np.loadtxt(target + '/np.txt')
+X= np.loadtxt('datasets/' + target + '/np.txt')
 N = X.shape[0]
 D = 2
 train_N = N // 5 * 4

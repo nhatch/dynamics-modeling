@@ -5,8 +5,8 @@ import numpy as np
 import scipy.spatial.transform as trf
 
 target = 'sim_data'
-cmd_vel_file = open(target + '/cmd_vel.txt', newline='')
-pose_file = open(target + '/pose.txt', newline='') # ground truth
+cmd_vel_file = open('datasets/' + target + '/cmd_vel.txt', newline='')
+pose_file = open('datasets/' + target + '/gt_pose.txt', newline='') # ground truth
 
 cmd_vel_reader = csv.DictReader(cmd_vel_file)
 pose_reader = csv.DictReader(pose_file)
@@ -78,6 +78,6 @@ for row in cmd_vel_reader:
     prev_cmd_vel_time = cmd_vel_time
     prev_pose = pose
 
-np.savetxt(target + '/np.txt', data)
+np.savetxt('datasets/' + target + '/np.txt', data)
 cmd_vel_file.close()
 pose_file.close()

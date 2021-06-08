@@ -8,7 +8,7 @@ if __name__ == "__main__":
     #np.set_printoptions(precision=3, suppress=True)
 
     target = 'sim_data'
-    X = np.loadtxt(target + '/np.txt')
+    X = np.loadtxt('datasets/' + target + '/np.txt')
     N = X.shape[0]
     seqs = []
     seq = []
