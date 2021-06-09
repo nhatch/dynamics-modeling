@@ -11,10 +11,10 @@ WEIGHTS = np.array([10,10,100])
 # I think we don't want an affine model, since for zero input
 # we should actually get zero output.
 class LinearModel:
-    def __init__(self):
+    def __init__(self, delay_steps):
         self.w = None
         self.train_n_steps = None
-        self.delay_steps = 1
+        self.delay_steps = delay_steps
 
     def relative_pose(self, query_pose, reference_pose):
         diff = query_pose - reference_pose
@@ -151,7 +151,7 @@ class LinearModel:
 
 class MeanModel(LinearModel):
     def __init__(self):
-        super().__init__()
+        super().__init__(0)
         self.mean = None
         self.train_n_steps = 1
 
@@ -164,9 +164,8 @@ class MeanModel(LinearModel):
         return np.tile(self.mean, (xx.shape[0], 1))
 
 class UnicycleModel(LinearModel):
-    def __init__(self):
-        super().__init__()
-        self.delay_steps = 1
+    def __init__(self, delay_steps):
+        super().__init__(delay_steps)
         self.train_n_steps = 1
 
     def train(self, x_seqs, y_seqs, n_steps=1):

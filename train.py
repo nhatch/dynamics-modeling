@@ -1,5 +1,8 @@
 #!/home/nhatch2/miniconda3/bin/python3
 
+# Don't run training if unit tests fail
+import unit_test
+
 import numpy as np
 from models import *
 import matplotlib.pyplot as plt
@@ -48,12 +51,12 @@ if __name__ == "__main__":
     mean_score = mean_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
     print("Mean model:    ", mean_score)
 
-    uni_model = UnicycleModel()
+    uni_model = UnicycleModel(delay_steps=1)
     uni_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
     uni_score = uni_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
     print("Unicycle model:", uni_score)
 
-    linear_model = LinearModel()
+    linear_model = LinearModel(delay_steps=1)
     linear_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
     linear_score = linear_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
     print("Linear model:  ", linear_score)

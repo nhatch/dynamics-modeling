@@ -3,7 +3,7 @@
 import numpy as np
 from models import LinearModel
 
-model = LinearModel()
+model = LinearModel(delay_steps=0)
 
 queries = np.array([
     [1,1, np.pi/4],
@@ -68,6 +68,5 @@ assert(np.allclose(circle_nstep_1, circle_true_1))
 assert(np.allclose(circle_nstep_2, circle_true_2))
 
 circle_rollout = model.rollout_one_steps(circle_nstep_1, 4)
-print(circle_rollout)
 assert(np.allclose(circle_rollout, circle_seq[-1, 2:]))
 
