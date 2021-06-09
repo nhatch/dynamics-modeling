@@ -70,3 +70,9 @@ assert(np.allclose(circle_nstep_2, circle_true_2))
 circle_rollout = model.rollout_one_steps(circle_nstep_1, 4)
 assert(np.allclose(circle_rollout, circle_seq[-1, 2:]))
 
+model_with_delay = LinearModel(delay_steps=1)
+circle_nstep_2_with_delay = model_with_delay.get_n_step_targets(circle_seq[:,2:], 2)
+circle_true_2_with_delay = np.array([
+    model.relative_pose(np.array([[0.5, 0.3, 0.9]]), np.array([[0.2, 0.1, 0.3]])).flatten(),
+    model.relative_pose(np.array([[0.6, 0.5, 1.2]]), np.array([[0.4, 0.2, 0.6]])).flatten()])
+assert(np.allclose(circle_nstep_2_with_delay, circle_true_2_with_delay))
