@@ -5,9 +5,10 @@ To collect a simulator dataset:
 3. Use Rviz or manual control to execute however many trajectories you want.
 4. Stop the dyndata.sh script.
 5. Run `extract.sh BAGFILE DATASET_NAME` (from inside the docker container)
-6. From outside the docker container, move the folder DATASET_NAME into this repo.
+6. From outside the docker container, move the folder `DATASET_NAME` into this repo.
 
 To run the stuff in this repo [TODO]:
 
-1. `extract_ml.sh`
-2. `train.sh`
+1. Edit `extract_ml.py` and `train.py` to have the correct `target`/`DATASET_NAME`.
+2. `extract_ml.py`
+3. `train.py`
