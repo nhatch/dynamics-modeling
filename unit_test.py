@@ -3,7 +3,9 @@
 import numpy as np
 from models import LinearModel
 
-model = LinearModel(delay_steps=0)
+D = 4
+
+model = LinearModel(num_features=0, delay_steps=0)
 
 queries = np.array([
     [1,1, np.pi/4],
@@ -20,14 +22,14 @@ assert(np.allclose(relative, expected_relative))
 # Poses in world frame
 # d_x, d_th, p_x, p_y, p_th
 rotate_seq = np.array([
-    [0.0, -1.0, 0.0, 0.0, 1.0],
-    [0.0, -1.0, 0.0, 0.0, 0.5],
-    [0.0, -1.0, 0.0, 0.0, 0.0],
-    [0.0, -1.0, 0.0, 0.0, 2*np.pi - 0.5],
-    [0.0, -1.0, 0.0, 0.0, 2*np.pi - 1.0]])
+    [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+    [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5],
+    [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 2*np.pi - 0.5],
+    [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 2*np.pi - 1.0]])
 
-rotate_nstep_1 = model.get_n_step_targets(rotate_seq[:,2:], 1)
-rotate_nstep_2 = model.get_n_step_targets(rotate_seq[:,2:], 2)
+rotate_nstep_1 = model.get_n_step_targets(rotate_seq[:,D:], 1)
+rotate_nstep_2 = model.get_n_step_targets(rotate_seq[:,D:], 2)
 
 rotate_true_1 = np.array([
     [0.0, 0.0, -0.5],
@@ -44,14 +46,14 @@ assert(np.allclose(rotate_nstep_1, rotate_true_1))
 assert(np.allclose(rotate_nstep_2, rotate_true_2))
 
 circle_seq = np.array([
-    [1.0, 1.0, 0.0, 0.0, 0.0],
-    [1.0, 1.0, 0.2, 0.1, 0.3],
-    [1.0, 1.0, 0.4, 0.2, 0.6],
-    [1.0, 1.0, 0.5, 0.3, 0.9],
-    [1.0, 1.0, 0.6, 0.5, 1.2]])
+    [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    [1.0, 1.0, 0.0, 0.0, 0.2, 0.1, 0.3],
+    [1.0, 1.0, 0.0, 0.0, 0.4, 0.2, 0.6],
+    [1.0, 1.0, 0.0, 0.0, 0.5, 0.3, 0.9],
+    [1.0, 1.0, 0.0, 0.0, 0.6, 0.5, 1.2]])
 
-circle_nstep_1 = model.get_n_step_targets(circle_seq[:,2:], 1)
-circle_nstep_2 = model.get_n_step_targets(circle_seq[:,2:], 2)
+circle_nstep_1 = model.get_n_step_targets(circle_seq[:,D:], 1)
+circle_nstep_2 = model.get_n_step_targets(circle_seq[:,D:], 2)
 
 circle_true_1 = np.array([
     [0.2, 0.1, 0.3],
@@ -68,10 +70,10 @@ assert(np.allclose(circle_nstep_1, circle_true_1))
 assert(np.allclose(circle_nstep_2, circle_true_2))
 
 circle_rollout = model.rollout_one_steps(circle_nstep_1, 4)
-assert(np.allclose(circle_rollout, circle_seq[-1, 2:]))
+assert(np.allclose(circle_rollout, circle_seq[-1, D:]))
 
-model_with_delay = LinearModel(delay_steps=1)
-circle_nstep_2_with_delay = model_with_delay.get_n_step_targets(circle_seq[:,2:], 2)
+model_with_delay = LinearModel(num_features=0, delay_steps=1)
+circle_nstep_2_with_delay = model_with_delay.get_n_step_targets(circle_seq[:,D:], 2)
 circle_true_2_with_delay = np.array([
     model.relative_pose(np.array([[0.5, 0.3, 0.9]]), np.array([[0.2, 0.1, 0.3]])).flatten(),
     model.relative_pose(np.array([[0.6, 0.5, 1.2]]), np.array([[0.4, 0.2, 0.6]])).flatten()])

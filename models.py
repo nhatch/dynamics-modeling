@@ -11,10 +11,16 @@ WEIGHTS = np.array([10,10,100])
 # I think we don't want an affine model, since for zero input
 # we should actually get zero output.
 class LinearModel:
-    def __init__(self, delay_steps):
+    def __init__(self, num_features, delay_steps, ignore_indices=[]):
         self.w = None
         self.train_n_steps = None
         self.delay_steps = delay_steps
+        self.features_to_use = np.ones(num_features, dtype=np.bool)
+        for idx in ignore_indices:
+            if idx >= num_features:
+                print("Warning: ignoring index larger than dataset size")
+                continue
+            self.features_to_use[idx] = False
 
     def relative_pose(self, query_pose, reference_pose):
         diff = query_pose - reference_pose
@@ -41,11 +47,11 @@ class LinearModel:
         rollout_x_seqs = []
         rollout_y_seqs = []
         for s in range(n_seqs):
-            xx = x_seqs[s]
+            xx = x_seqs[s][:,self.features_to_use]
             yy = y_seqs[s]
             seq_len = len(yy) - n_steps - self.delay_steps
             assert(len(xx) == len(yy))
-            assert(xx.shape[1] == 2)
+            assert(xx.shape[1] == self.features_to_use.sum())
             target_deltas = self.get_n_step_targets(yy, n_steps)
             # TODO if n_steps > 1, we should concatenate multiple commands together
             rollout_x_seqs.append(xx[:seq_len,:])
@@ -78,7 +84,7 @@ class LinearModel:
         return pred_seqs
 
     def predict_one_steps(self, xx):
-        return xx @ self.w
+        return xx[:,self.features_to_use] @ self.w
 
     def rollout_one_steps(self, one_steps, n_steps):
         # TODO dealing with delays will be more complicated with dynamics models that
@@ -151,7 +157,7 @@ class LinearModel:
 
 class MeanModel(LinearModel):
     def __init__(self):
-        super().__init__(0)
+        super().__init__(0, 0)
         self.mean = None
         self.train_n_steps = 1
 
@@ -164,8 +170,9 @@ class MeanModel(LinearModel):
         return np.tile(self.mean, (xx.shape[0], 1))
 
 class UnicycleModel(LinearModel):
-    def __init__(self, delay_steps):
-        super().__init__(delay_steps)
+    def __init__(self, num_features, delay_steps):
+        # Unicycle model doesn't account for velocity state (features 2 and 3)
+        super().__init__(num_features, delay_steps, ignore_indices=[2,3])
         self.train_n_steps = 1
 
     def train(self, x_seqs, y_seqs, n_steps=1):
@@ -173,4 +180,7 @@ class UnicycleModel(LinearModel):
         effective_wheel_base = 1.80
         measured_wheel_base = 1.08
         theta_factor = measured_wheel_base / effective_wheel_base
-        self.w = dt * np.array([[1, 0, 0], [0, 0, theta_factor]])
+        self.w = dt * np.array([
+            [1, 0, 0],
+            [0, 0, theta_factor]
+            ])

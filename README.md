@@ -9,6 +9,5 @@ To collect a simulator dataset:
 
 To run the stuff in this repo [TODO]:
 
-1. Edit `extract_ml.py` and `train.py` to have the correct `target`/`DATASET_NAME`.
-2. `extract_ml.py`
-3. `train.py`
+1. `./extract_ml.py DATASET_NAME`
+2. `./train.py DATASET_NAME`

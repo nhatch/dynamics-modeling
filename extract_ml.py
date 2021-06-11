@@ -8,17 +8,21 @@ import scipy.spatial.transform as trf
 if len(sys.argv) < 2:
     print("You need to specify DATASET_NAME")
     sys.exit(0)
-
 target = sys.argv[1]
-cmd_vel_file = open('datasets/' + target + '/cmd_vel.txt', newline='')
-odom_file = open('datasets/' + target + '/odom.txt', newline='')
-gt_pose_file = open('datasets/' + target + '/gt_pose.txt', newline='')
-gt_twist_file = open('datasets/' + target + '/gt_twist.txt', newline='')
 
+cmd_vel_file = open('datasets/' + target + '/cmd_vel.txt', newline='')
+gt_pose_file = open('datasets/' + target + '/gt_pose.txt', newline='')
 cmd_vel_reader = csv.DictReader(cmd_vel_file)
-odom_reader = csv.DictReader(odom_file)
 gt_pose_reader = csv.DictReader(gt_pose_file)
-gt_twist_reader = csv.DictReader(gt_twist_file)
+
+has_twist = True
+try:
+    odom_file = open('datasets/' + target + '/odom.txt', newline='')
+    gt_twist_file = open('datasets/' + target + '/gt_twist.txt', newline='')
+    odom_reader = csv.DictReader(odom_file)
+    gt_twist_reader = csv.DictReader(gt_twist_file)
+except FileNotFoundError:
+    has_twist = False;
 
 data = []
 
@@ -96,9 +100,13 @@ for row in cmd_vel_reader:
     # There are many GT pose readings for each cmd_vel, so let's not
     # worry about interpolating to try to synchronize these timestamps.
     gt_pose = first_after(cmd_vel_time, gt_pose_fields, gt_pose_reader)
-    gt_twist = first_after(cmd_vel_time, gt_twist_fields, gt_twist_reader)
-    # Same for odom
-    odom_twist = first_after(cmd_vel_time, odom_twist_fields, odom_reader)
+
+    odom_twist = np.array([])
+    gt_twist = np.array([])
+    if has_twist:
+        gt_twist = first_after(cmd_vel_time, gt_twist_fields, gt_twist_reader)
+        # Same for odom
+        odom_twist = first_after(cmd_vel_time, odom_twist_fields, odom_reader)
 
     # sanity check this was 100ms
     time_diff = (cmd_vel_time - prev_cmd_vel_time) // 1000000
@@ -117,6 +125,7 @@ for row in cmd_vel_reader:
 np.savetxt('datasets/' + target + '/np_v1.txt', data)
 
 cmd_vel_file.close()
-odom_file.close()
 gt_pose_file.close()
-gt_twist_file.close()
+if has_twist:
+    odom_file.close()
+    gt_twist_file.close()
