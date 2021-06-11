@@ -31,12 +31,18 @@ if __name__ == "__main__":
         else:
             seq = np.concatenate([seq, data], 0)
 
-    # The number of values our model tries to predict
-    # P = 3 for poses (x, y, theta)
-    P = 3
-    # The number of features our model receives as input
-    # D = 4 for the datasets with twist: (cmd_vel_x, cmd_vel_th, odom_twist_x, odom_twist_z)
-    D = X.shape[1] - P - 1 # minus one for sequence number
+    if target == "sim_data":
+        D = 2
+        # P = 3 for poses (x, y, theta)
+        P = 3
+    elif target == "sim_odom_twist":
+        # This also includes odom measurements of dx, dtheta
+        D = 4
+        # This also includes dx, dy, dtheta
+        P = 6
+    else:
+        print("Unknown target dataset")
+        sys.exit(0)
 
     N_SEQS = len(seqs)
     print("Found seqs:", N_SEQS)
@@ -68,6 +74,7 @@ if __name__ == "__main__":
     uni_score = uni_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
     print("Unicycle model:", uni_score)
 
+    ''' This model doesn't make sense because it is using odom data from the future.
     linear_model = LinearModel(num_features=D, delay_steps=1)
     linear_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
     linear_score = linear_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
@@ -75,6 +82,7 @@ if __name__ == "__main__":
 
     print("linear weights")
     print(linear_model.w)
+    '''
 
     linear_no_odom_model = LinearModel(num_features=D, delay_steps=1, ignore_indices=[2,3])
     linear_no_odom_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
@@ -83,12 +91,17 @@ if __name__ == "__main__":
     print("linear weights (no odom)")
     print(linear_no_odom_model.w)
 
+    expected = np.array([[ 0.09578356, -0.00020478,  0.00039695],
+                         [ 0.00237972,  0.00028133,  0.03389382]])
+    if target == "sim_data" and not np.allclose(linear_no_odom_model.w, expected):
+        print("ERROR: Did not get expected weights for simple linear model")
+
     test_seq_no = 0
     start_idx = 100
     n_steps = 20
     t_start = start_idx-20 if start_idx > 20 else 0
     t_end = start_idx+n_steps+1
-    tx, ty, mx, my = linear_model.compare_qualitative(
+    tx, ty, mx, my = linear_no_odom_model.compare_qualitative(
             x_test[test_seq_no], y_test[test_seq_no], start_idx=start_idx, n_steps=n_steps)
     _, _, umx, umy = uni_model.compare_qualitative(
             x_test[test_seq_no], y_test[test_seq_no], start_idx=start_idx, n_steps=n_steps)

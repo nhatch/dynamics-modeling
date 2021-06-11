@@ -34,8 +34,8 @@ class LinearModel:
                          minimized_angle_diff]).T
 
     def get_n_step_targets(self, yy, n_steps):
-        assert(yy.shape[1] == 3)
-        targets = self.relative_pose(yy[n_steps:,:], yy[:-n_steps,:])
+        assert(yy.shape[1] == 3 or yy.shape[1] == 6)
+        targets = self.relative_pose(yy[n_steps:,:3], yy[:-n_steps,:3])
         # We can't do predictions for the first few steps if those depend
         # on data from previous timesteps.
         targets = targets[self.delay_steps:,:]
@@ -118,7 +118,7 @@ class LinearModel:
 
     def compare_qualitative(self, xx, yy, start_idx, n_steps):
         one_steps = self.predict_one_steps(xx[:-1,:])
-        start_state = yy[start_idx]
+        start_state = yy[start_idx,:3]
         ossi = start_idx - self.delay_steps
         relevant_one_steps = one_steps[ossi:ossi+n_steps]
         seq = self.rollout_single_sequence(relevant_one_steps, n_steps, start_state)

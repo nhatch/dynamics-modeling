@@ -38,7 +38,7 @@ def pose_difference(p2, p1):
     rot_vs_p1 = (r1.inv() * r2).as_euler('zyx')
     return np.concatenate([trans_vs_p1, rot_vs_p1])
 
-def xyt_pose(pose):
+def planar_pose(pose):
     r1 = trf.Rotation.from_quat(pose[3:])
     rot = r1.as_euler('zyx')
     return np.array([pose[0], pose[1], rot[0]])
@@ -84,14 +84,15 @@ gt_twist_fields = [
         'field.twist.angular.y',
         'field.twist.angular.z']
 
-def xz_twist(twist, pose):
+def planar_twist(twist, pose):
     # We need the `pose` because `twist` is given in the world frame,
     # while we want it in the robot base frame.
-    #
-    # HOWEVER, making this transform is hard, and actually I don't think
-    # I necessarily need it for my dynamics models (at least not until
-    # we get to recurrent models).
-    return np.array([])
+    theta = planar_pose(pose)[2]
+    linear_vel = np.cos(theta) * twist[0] + np.sin(theta) * twist[1]
+    # Transverse vel should be zero except for projection errors and
+    # times when the robot is slipping sideways.
+    transverse_vel = -np.sin(theta) * twist[0] + np.cos(theta) * twist[1]
+    return np.array([linear_vel, transverse_vel, twist[5]])
 
 num_zero = 0
 for row in cmd_vel_reader:
@@ -120,14 +121,14 @@ for row in cmd_vel_reader:
     gt_pose = first_after(cmd_vel_time, gt_pose_fields, gt_pose_reader)
 
     odom_twist = np.array([])
-    gt_twist = np.array([])
+    planar_gt_twist = np.array([])
     if has_twist:
         gt_twist = first_after(cmd_vel_time, gt_twist_fields, gt_twist_reader)
-        # Same for odom
+        planar_gt_twist = planar_twist(gt_twist, gt_pose)
         odom_twist = first_after(cmd_vel_time, odom_twist_fields, odom_reader)
 
     data_row = np.concatenate([[seq_no], cmd_vel, odom_twist,
-            xyt_pose(gt_pose), xz_twist(gt_twist, gt_pose)])
+            planar_pose(gt_pose), planar_gt_twist])
     data.append(data_row)
 
     prev_cmd_vel_time = cmd_vel_time
