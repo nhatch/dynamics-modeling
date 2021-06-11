@@ -93,10 +93,28 @@ def xz_twist(twist, pose):
     # we get to recurrent models).
     return np.array([])
 
+num_zero = 0
 for row in cmd_vel_reader:
     cmd_vel_time = int(row['%time'])
-
     cmd_vel = get_fields(row, cmd_vel_fields)
+
+    # sanity check this was 100ms
+    time_diff = (cmd_vel_time - prev_cmd_vel_time) // 1000000
+    if time_diff == 0:
+        print("WARNING: Got time diff of zero, "
+            "cmd_vel {:.3f} {:.3f} vs previous {:.3f} {:.3f}".format(
+            cmd_vel[0], cmd_vel[1], data[-1][1], data[-1][2]))
+        num_zero += 1
+        # Let's assume whichever was later in the rosbag is the one that
+        # actually got executed on the system.
+        # TODO: Why is this happening? Should I collect cmd_vel_stamped?
+        data[-1][1] = cmd_vel[0]
+        data[-1][2] = cmd_vel[1]
+        continue
+    elif time_diff != 100:
+        print("WARNING: Weird time diff", time_diff)
+        seq_no += 1
+
     # There are many GT pose readings for each cmd_vel, so let's not
     # worry about interpolating to try to synchronize these timestamps.
     gt_pose = first_after(cmd_vel_time, gt_pose_fields, gt_pose_reader)
@@ -108,21 +126,14 @@ for row in cmd_vel_reader:
         # Same for odom
         odom_twist = first_after(cmd_vel_time, odom_twist_fields, odom_reader)
 
-    # sanity check this was 100ms
-    time_diff = (cmd_vel_time - prev_cmd_vel_time) // 1000000
-    if time_diff == 0:
-        continue
-    elif time_diff != 100:
-        print("WARNING: Weird time diff", time_diff)
-        seq_no += 1
-
     data_row = np.concatenate([[seq_no], cmd_vel, odom_twist,
             xyt_pose(gt_pose), xz_twist(gt_twist, gt_pose)])
     data.append(data_row)
 
     prev_cmd_vel_time = cmd_vel_time
 
-np.savetxt('datasets/' + target + '/np_v1.txt', data)
+print("Got num zero:", num_zero)
+np.savetxt('datasets/' + target + '/np.txt', data)
 
 cmd_vel_file.close()
 gt_pose_file.close()

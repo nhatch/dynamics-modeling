@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     #np.set_printoptions(precision=3, suppress=True)
 
-    X = np.loadtxt('datasets/' + target + '/np_v1.txt')
+    X = np.loadtxt('datasets/' + target + '/np.txt')
     N = X.shape[0]
     seqs = []
     seq = []
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # P = 3 for poses (x, y, theta)
     P = 3
     # The number of features our model receives as input
-    # D = 4 for the np_v1.txt datasets: (cmd_vel_x, cmd_vel_th, odom_twist_x, odom_twist_z)
+    # D = 4 for the datasets with twist: (cmd_vel_x, cmd_vel_th, odom_twist_x, odom_twist_z)
     D = X.shape[1] - P - 1 # minus one for sequence number
 
     N_SEQS = len(seqs)
