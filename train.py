@@ -33,11 +33,13 @@ if __name__ == "__main__":
 
     if target == "sim_data":
         D = 2
+        H = 0
         # P = 3 for poses (x, y, theta)
         P = 3
     elif target == "sim_odom_twist":
+        D = 2
         # This also includes odom measurements of dx, dtheta
-        D = 4
+        H = 2
         # This also includes dx, dy, dtheta
         P = 6
     else:
@@ -47,46 +49,43 @@ if __name__ == "__main__":
     N_SEQS = len(seqs)
     print("Found seqs:", N_SEQS)
     print("Of lengths:", list(map(lambda s: len(s), seqs)))
-    print("With num_features:", D)
     train_N_SEQS = N_SEQS * 4 // 5
     test_N_SEQS = N_SEQS - train_N_SEQS
     assert(test_N_SEQS > 0)
 
-    assert(seqs[0].shape[1] == D+P)
-    x_train = list(map(lambda s: s[:,:D], seqs[:train_N_SEQS]))
-    y_train = list(map(lambda s: s[:,D:], seqs[:train_N_SEQS]))
-    x_test = list(map(lambda s: s[:,:D], seqs[train_N_SEQS:]))
-    y_test = list(map(lambda s: s[:,D:], seqs[train_N_SEQS:]))
+    assert(seqs[0].shape[1] == D+H+P)
+    train_set = seqs[:train_N_SEQS]
+    test_set = seqs[train_N_SEQS:]
 
-    print("first train seq shape:", x_train[0].shape)
-    print("first test seq shape:", x_test[0].shape)
+    print("first train seq shape:", train_set[0].shape)
+    print("first test seq shape:", test_set[0].shape)
 
     N_TRAIN_STEPS = 1
     N_EVAL_STEPS = 20
 
-    mean_model = MeanModel()
-    mean_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    mean_score = mean_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    mean_model = MeanModel(D=D, H=H, P=P)
+    mean_model.train(train_set, n_steps=N_TRAIN_STEPS)
+    mean_score = mean_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Mean model:    ", mean_score)
 
-    uni_model = UnicycleModel(num_features=D, delay_steps=1)
-    uni_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    uni_score = uni_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    uni_model = UnicycleModel(D=D, H=H, P=P, delay_steps=1)
+    uni_model.train(train_set, n_steps=N_TRAIN_STEPS)
+    uni_score = uni_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Unicycle model:", uni_score)
 
     ''' This model doesn't make sense because it is using odom data from the future.
-    linear_model = LinearModel(num_features=D, delay_steps=1)
-    linear_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    linear_score = linear_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    linear_model = LinearModel(D=D, H=H, P=P, delay_steps=1)
+    linear_model.train(train_set, n_steps=N_TRAIN_STEPS)
+    linear_score = linear_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Linear model:  ", linear_score)
 
     print("linear weights")
     print(linear_model.w)
     '''
 
-    linear_no_odom_model = LinearModel(num_features=D, delay_steps=1, ignore_indices=[2,3])
-    linear_no_odom_model.train(x_train, y_train, n_steps=N_TRAIN_STEPS)
-    linear_no_odom_score = linear_no_odom_model.evaluate(x_test, y_test, n_steps=N_EVAL_STEPS)
+    linear_no_odom_model = LinearModel(D=D, H=H, P=P, delay_steps=1)
+    linear_no_odom_model.train(train_set, n_steps=N_TRAIN_STEPS)
+    linear_no_odom_score = linear_no_odom_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Linear model (no odom):  ", linear_no_odom_score)
     print("linear weights (no odom)")
     print(linear_no_odom_model.w)
@@ -102,9 +101,9 @@ if __name__ == "__main__":
     t_start = start_idx-20 if start_idx > 20 else 0
     t_end = start_idx+n_steps+1
     tx, ty, mx, my = linear_no_odom_model.compare_qualitative(
-            x_test[test_seq_no], y_test[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+            test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
     _, _, umx, umy = uni_model.compare_qualitative(
-            x_test[test_seq_no], y_test[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+            test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
     plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black')
     plt.plot(mx, my, color='blue')
     plt.plot(umx, umy, color='red')

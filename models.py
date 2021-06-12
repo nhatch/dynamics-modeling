@@ -11,16 +11,14 @@ WEIGHTS = np.array([10,10,100])
 # I think we don't want an affine model, since for zero input
 # we should actually get zero output.
 class LinearModel:
-    def __init__(self, num_features, delay_steps, ignore_indices=[]):
+    def __init__(self, D, H, P, delay_steps):
         self.w = None
         self.train_n_steps = None
         self.delay_steps = delay_steps
-        self.features_to_use = np.ones(num_features, dtype=np.bool)
-        for idx in ignore_indices:
-            if idx >= num_features:
-                print("Warning: ignoring index larger than dataset size")
-                continue
-            self.features_to_use[idx] = False
+        self.features_to_use = np.zeros(D+H+P, dtype=np.bool)
+        self.features_to_predict = np.zeros(D+H+P, dtype=np.bool)
+        self.features_to_use[:D] = True
+        self.features_to_predict[D+H:D+H+3] = True
 
     def relative_pose(self, query_pose, reference_pose):
         diff = query_pose - reference_pose
@@ -41,14 +39,13 @@ class LinearModel:
         targets = targets[self.delay_steps:,:]
         return targets
 
-    def concat_seqs(self, x_seqs, y_seqs, n_steps):
-        n_seqs = len(x_seqs)
-        assert(n_seqs == len(y_seqs))
+    def concat_seqs(self, seqs, n_steps):
+        n_seqs = len(seqs)
         rollout_x_seqs = []
         rollout_y_seqs = []
         for s in range(n_seqs):
-            xx = x_seqs[s][:,self.features_to_use]
-            yy = y_seqs[s]
+            xx = seqs[s][:,self.features_to_use]
+            yy = seqs[s][:,self.features_to_predict]
             seq_len = len(yy) - n_steps - self.delay_steps
             assert(len(xx) == len(yy))
             assert(xx.shape[1] == self.features_to_use.sum())
@@ -61,11 +58,11 @@ class LinearModel:
         train_y = np.concatenate(rollout_y_seqs, 0)
         return train_x, train_y
 
-    def train(self, x_seqs, y_seqs, n_steps=1):
+    def train(self, seqs, n_steps=1):
         self.train_n_steps = n_steps
         if n_steps != 1:
             print("Warning: Linear model training with n_steps > 1 is not supported!")
-        train_x, train_y = self.concat_seqs(x_seqs, y_seqs, n_steps)
+        train_x, train_y = self.concat_seqs(seqs, n_steps)
         weighted_y = train_y * WEIGHTS
         assert(weighted_y.shape == train_y.shape)
         assert(len(train_x) == len(train_y))
@@ -75,16 +72,8 @@ class LinearModel:
         self.w = weighted_w / WEIGHTS
         assert(self.w.shape == weighted_w.shape)
 
-    def predict(self, x_seqs, n_steps=1):
-        if self.train_n_steps != 1:
-            print("Warning: Trained with n_steps != 1; don't know how to predict")
-        pred_seqs = []
-        for xx in x_seqs:
-            pred_seqs.append(self.predict_seq(xx, n_steps))
-        return pred_seqs
-
     def predict_one_steps(self, xx):
-        return xx[:,self.features_to_use] @ self.w
+        return xx @ self.w
 
     def rollout_one_steps(self, one_steps, n_steps):
         # TODO dealing with delays will be more complicated with dynamics models that
@@ -116,7 +105,9 @@ class LinearModel:
             seq[t+1,:] = seq[t,:] + world_summand
         return seq
 
-    def compare_qualitative(self, xx, yy, start_idx, n_steps):
+    def compare_qualitative(self, seq, start_idx, n_steps):
+        xx = seq[:,self.features_to_use]
+        yy = seq[:,self.features_to_predict]
         one_steps = self.predict_one_steps(xx[:-1,:])
         start_state = yy[start_idx,:3]
         ossi = start_idx - self.delay_steps
@@ -132,15 +123,15 @@ class LinearModel:
         one_steps = self.predict_one_steps(xx[:-1,:])
         return self.rollout_one_steps(one_steps, n_steps)
 
-    def evaluate(self, x_seqs, y_seqs, n_steps=1):
-        n_seqs = len(x_seqs)
-        assert(n_seqs == len(y_seqs))
-        pred_seqs = self.predict(x_seqs, n_steps)
-        assert(len(pred_seqs) == len(y_seqs))
+    def evaluate(self, seqs, n_steps=1):
+        if self.train_n_steps != 1:
+            print("Warning: Trained with n_steps != 1; don't know how to predict")
+        n_seqs = len(seqs)
         all_errs = []
         for s in range(n_seqs):
-            pp = pred_seqs[s]
-            yy = y_seqs[s]
+            xx = seqs[s][:,self.features_to_use]
+            yy = seqs[s][:,self.features_to_predict]
+            pp = self.predict_seq(xx, n_steps)
             targets = self.get_n_step_targets(yy, n_steps)
             assert(targets.shape == pp.shape)
             #print(pp[:10,:])
@@ -156,13 +147,13 @@ class LinearModel:
         return concat_errs.mean()
 
 class MeanModel(LinearModel):
-    def __init__(self):
-        super().__init__(0, 0)
+    def __init__(self, D, H, P):
+        super().__init__(D, H, P, 0)
         self.mean = None
         self.train_n_steps = 1
 
-    def train(self, x_seqs, y_seqs, n_steps=1):
-        train_x, train_y = self.concat_seqs(x_seqs, y_seqs, n_steps)
+    def train(self, seqs, n_steps=1):
+        train_x, train_y = self.concat_seqs(seqs, n_steps)
         self.mean = train_y.mean(axis=0)
         assert(self.mean.shape == (train_y.shape[1],))
 
@@ -170,12 +161,12 @@ class MeanModel(LinearModel):
         return np.tile(self.mean, (xx.shape[0], 1))
 
 class UnicycleModel(LinearModel):
-    def __init__(self, num_features, delay_steps):
+    def __init__(self, D, H, P, delay_steps):
         # Unicycle model doesn't account for velocity state (features 2 and 3)
-        super().__init__(num_features, delay_steps, ignore_indices=[2,3])
+        super().__init__(D, H, P, delay_steps)
         self.train_n_steps = 1
 
-    def train(self, x_seqs, y_seqs, n_steps=1):
+    def train(self, seqs, n_steps=1):
         dt = 0.1
         effective_wheel_base = 1.80
         measured_wheel_base = 1.08

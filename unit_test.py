@@ -5,7 +5,7 @@ from models import LinearModel
 
 D = 4
 
-model = LinearModel(num_features=0, delay_steps=0)
+model = LinearModel(D=2, H=2, P=3, delay_steps=0)
 
 queries = np.array([
     [1,1, np.pi/4],
@@ -72,7 +72,7 @@ assert(np.allclose(circle_nstep_2, circle_true_2))
 circle_rollout = model.rollout_one_steps(circle_nstep_1, 4)
 assert(np.allclose(circle_rollout, circle_seq[-1, D:]))
 
-model_with_delay = LinearModel(num_features=0, delay_steps=1)
+model_with_delay = LinearModel(D=2, H=2, P=3, delay_steps=1)
 circle_nstep_2_with_delay = model_with_delay.get_n_step_targets(circle_seq[:,D:], 2)
 circle_true_2_with_delay = np.array([
     model.relative_pose(np.array([[0.5, 0.3, 0.9]]), np.array([[0.2, 0.1, 0.3]])).flatten(),
