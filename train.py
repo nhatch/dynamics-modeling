@@ -13,6 +13,12 @@ if __name__ == "__main__":
         print("You need to specify DATASET_NAME")
         sys.exit(0)
     target = sys.argv[1]
+    viz_seq_no = -1
+    viz_start_idx = 50
+    if len(sys.argv) == 4:
+        viz_seq_no = int(sys.argv[2])
+        viz_start_idx = int(sys.argv[3])
+
 
     #np.set_printoptions(precision=3, suppress=True)
 
@@ -66,7 +72,7 @@ if __name__ == "__main__":
     if P == 6:
         gt_twist_model = GTTwistModel(D=D, H=H, P=P)
         gt_twist_score_pretraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
-        gt_twist_model.train(train_set, n_steps=N_TRAIN_STEPS)
+        #gt_twist_model.train(train_set, n_steps=N_TRAIN_STEPS)
         gt_twist_score_posttraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
         print("Ground truth twist baseline: untrained {} trained {}".format(
                 gt_twist_score_pretraining, gt_twist_score_posttraining))
@@ -95,21 +101,20 @@ if __name__ == "__main__":
     if target == "sim_data" and not np.allclose(linear_model.w, expected):
         print("ERROR: Did not get expected weights for simple linear model")
 
-    test_seq_no = -1
-    start_idx = 50
+    viz_seq = seqs[viz_seq_no]
     n_steps = 20
-    t_start = start_idx-20 if start_idx > 20 else 0
-    t_end = start_idx+n_steps+1
+    t_start = viz_start_idx-20 if viz_start_idx > 20 else 0
+    t_end = viz_start_idx+n_steps+1
     tx, ty, mx, my = linear_model.compare_qualitative(
-            test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
     _, _, umx, umy = uni_model.compare_qualitative(
-            test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
     plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black')
     plt.plot(mx, my, color='blue')
     plt.plot(umx, umy, color='red')
     if P == 6:
         _, _, gmx, gmy = gt_twist_model.compare_qualitative(
-                test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+                viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
         plt.plot(gmx, gmy, color='green')
     plt.savefig('out.png')
 
