@@ -175,3 +175,15 @@ class UnicycleModel(LinearModel):
             [1, 0, 0],
             [0, 0, theta_factor]
             ])
+
+class GTTwistModel(LinearModel):
+    def __init__(self, D, H, P):
+        super().__init__(D, H, P, 0)
+        assert(P == 6)
+        self.features_to_use = np.zeros(D+H+P, dtype=np.bool)
+        self.features_to_use[-3:] = True
+        self.train_n_steps = 1
+
+        # Before training, set a default
+        dt = 0.1
+        self.w = dt * np.eye(3)

@@ -63,6 +63,16 @@ if __name__ == "__main__":
     N_TRAIN_STEPS = 1
     N_EVAL_STEPS = 20
 
+    if P == 6:
+        gt_twist_model = GTTwistModel(D=D, H=H, P=P)
+        gt_twist_score_pretraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
+        gt_twist_model.train(train_set, n_steps=N_TRAIN_STEPS)
+        gt_twist_score_posttraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
+        print("Ground truth twist baseline: untrained {} trained {}".format(
+                gt_twist_score_pretraining, gt_twist_score_posttraining))
+        print("Ground truth twist, weights post training")
+        print(gt_twist_model.w)
+
     mean_model = MeanModel(D=D, H=H, P=P)
     mean_model.train(train_set, n_steps=N_TRAIN_STEPS)
     mean_score = mean_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
@@ -73,38 +83,33 @@ if __name__ == "__main__":
     uni_score = uni_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Unicycle model:", uni_score)
 
-    ''' This model doesn't make sense because it is using odom data from the future.
     linear_model = LinearModel(D=D, H=H, P=P, delay_steps=1)
     linear_model.train(train_set, n_steps=N_TRAIN_STEPS)
     linear_score = linear_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Linear model:  ", linear_score)
-
-    print("linear weights")
+    print("Linear weights")
     print(linear_model.w)
-    '''
-
-    linear_no_odom_model = LinearModel(D=D, H=H, P=P, delay_steps=1)
-    linear_no_odom_model.train(train_set, n_steps=N_TRAIN_STEPS)
-    linear_no_odom_score = linear_no_odom_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
-    print("Linear model (no odom):  ", linear_no_odom_score)
-    print("linear weights (no odom)")
-    print(linear_no_odom_model.w)
 
     expected = np.array([[ 0.09578356, -0.00020478,  0.00039695],
                          [ 0.00237972,  0.00028133,  0.03389382]])
-    if target == "sim_data" and not np.allclose(linear_no_odom_model.w, expected):
+    if target == "sim_data" and not np.allclose(linear_model.w, expected):
         print("ERROR: Did not get expected weights for simple linear model")
 
-    test_seq_no = 0
-    start_idx = 100
+    test_seq_no = -1
+    start_idx = 50
     n_steps = 20
     t_start = start_idx-20 if start_idx > 20 else 0
     t_end = start_idx+n_steps+1
-    tx, ty, mx, my = linear_no_odom_model.compare_qualitative(
+    tx, ty, mx, my = linear_model.compare_qualitative(
             test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
     _, _, umx, umy = uni_model.compare_qualitative(
             test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
     plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black')
     plt.plot(mx, my, color='blue')
     plt.plot(umx, umy, color='red')
+    if P == 6:
+        _, _, gmx, gmy = gt_twist_model.compare_qualitative(
+                test_set[test_seq_no], start_idx=start_idx, n_steps=n_steps)
+        plt.plot(gmx, gmy, color='green')
     plt.savefig('out.png')
+
