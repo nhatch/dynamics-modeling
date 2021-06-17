@@ -1,3 +1,13 @@
 Why is ground truth oracle not super accurate?
 - To reproduce: look at qualitative output of ./train.py sim_odom_twist 0 40
 - Try rolling out the twist more carefully (not just one linearized jump)
+
+Linear model predicting twists, rather than changes in pose
+Switch to Pytorch
+Collect a much larger dataset
+Implement / train / evaluate recurrent model
+Port implementation of best Warthog model to Phoenix stack
+
+Collect RZR dataset
+Implement / train / evaluate bicycle model
+Port implementation of best model to Phoenix stack

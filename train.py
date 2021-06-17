@@ -69,10 +69,19 @@ if __name__ == "__main__":
     N_TRAIN_STEPS = 1
     N_EVAL_STEPS = 20
 
+    # Qualitative visualization
+    viz_seq = seqs[viz_seq_no]
+    n_steps = 20
+    t_start = viz_start_idx-20 if viz_start_idx > 20 else 0
+    t_end = viz_start_idx+n_steps+1
+
     if P == 6:
         gt_twist_model = GTTwistModel(D=D, H=H, P=P)
         gt_twist_score_pretraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
-        #gt_twist_model.train(train_set, n_steps=N_TRAIN_STEPS)
+        _, _, gmx, gmy = gt_twist_model.compare_qualitative(
+                viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
+        line, = plt.plot(gmx, gmy, color='green', label='Rollout ground truth twist')
+        gt_twist_model.train(train_set, n_steps=N_TRAIN_STEPS)
         gt_twist_score_posttraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
         print("Ground truth twist baseline: untrained {} trained {}".format(
                 gt_twist_score_pretraining, gt_twist_score_posttraining))
@@ -86,11 +95,18 @@ if __name__ == "__main__":
 
     uni_model = UnicycleModel(D=D, H=H, P=P, delay_steps=1)
     uni_model.train(train_set, n_steps=N_TRAIN_STEPS)
+    _, _, umx, umy = uni_model.compare_qualitative(
+            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
+    line, = plt.plot(umx, umy, color='red', label='Unicycle model')
     uni_score = uni_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Unicycle model:", uni_score)
 
     linear_model = LinearModel(D=D, H=H, P=P, delay_steps=1)
     linear_model.train(train_set, n_steps=N_TRAIN_STEPS)
+    tx, ty, mx, my = linear_model.compare_qualitative(
+            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
+    line, = plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black', label='Ground truth')
+    line, = plt.plot(mx, my, color='blue', label='Fitted linear model')
     linear_score = linear_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Linear model:  ", linear_score)
     print("Linear weights")
@@ -101,20 +117,6 @@ if __name__ == "__main__":
     if target == "sim_data" and not np.allclose(linear_model.w, expected):
         print("ERROR: Did not get expected weights for simple linear model")
 
-    viz_seq = seqs[viz_seq_no]
-    n_steps = 20
-    t_start = viz_start_idx-20 if viz_start_idx > 20 else 0
-    t_end = viz_start_idx+n_steps+1
-    tx, ty, mx, my = linear_model.compare_qualitative(
-            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
-    _, _, umx, umy = uni_model.compare_qualitative(
-            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
-    plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black')
-    plt.plot(mx, my, color='blue')
-    plt.plot(umx, umy, color='red')
-    if P == 6:
-        _, _, gmx, gmy = gt_twist_model.compare_qualitative(
-                viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
-        plt.plot(gmx, gmy, color='green')
+    plt.legend()
     plt.savefig('out.png')
 
