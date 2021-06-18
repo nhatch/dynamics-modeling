@@ -118,5 +118,6 @@ if __name__ == "__main__":
         print("ERROR: Did not get expected weights for simple linear model")
 
     plt.legend()
+    plt.axis('equal')
     plt.savefig('out.png')
 

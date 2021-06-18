@@ -91,7 +91,8 @@ class LinearModel:
             preds += world_summand
         return preds
 
-    def rollout_single_sequence(self, one_steps, n_steps, start_state):
+    def rollout_single_sequence(self, one_steps, start_state):
+        n_steps = one_steps.shape[0]
         seq = np.zeros((n_steps+1, one_steps.shape[1]))
         seq[0] = start_state
         for t in range(n_steps):
@@ -112,7 +113,7 @@ class LinearModel:
         start_state = yy[start_idx,:3]
         ossi = start_idx - self.delay_steps
         relevant_one_steps = one_steps[ossi:ossi+n_steps]
-        seq = self.rollout_single_sequence(relevant_one_steps, n_steps, start_state)
+        seq = self.rollout_single_sequence(relevant_one_steps, start_state)
         tx = yy[:,0]
         ty = yy[:,1]
         mx = seq[:,0]
