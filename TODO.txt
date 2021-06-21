@@ -1,13 +1,35 @@
-Why is ground truth oracle not super accurate?
-- To reproduce: look at qualitative output of ./train.py sim_odom_twist 0 40
-- Try rolling out the twist more carefully (not just one linearized jump)
 
-Linear model predicting twists, rather than changes in pose
+STEPPING STONES TO RECURRENCE
+
+Use odom estimate of current state just for the first prediction. After that use a state-free model. (Getting accurate early predictions is especially important.)
+
+Use a model that takes multiple steps of command input (e.g. 3) to predict the delta-state after the final command of the sequence. One advantage: this can in some sense 'automatically' learn a time delay.
+
+After that I really have no choice but to try a recurrent model.
+
+TODO
+
 Switch to Pytorch
 Collect a much larger dataset
 Implement / train / evaluate recurrent model
+- Idea: include intermediate predictions of odom, motor power, filtered IMU estimates, ground truth pose, ground truth twist, etc. in the objective function. Encourage the model to be able to predict these from the hidden state.
 Port implementation of best Warthog model to Phoenix stack
 
 Collect RZR dataset
 Implement / train / evaluate bicycle model
 Port implementation of best model to Phoenix stack
+
+LESSONS
+
+- Even having ground truth twist is not enough for hyper-accurate rollouts using planar models
+  - At best I can reduce error by ~50% relative to the current linear model
+  - To reproduce: look at qualitative output of ./train.py sim_odom_twist 0 40
+- I could try doing rollouts using full 6D pose?
+
+
+ABANDONED IDEAS:
+
+Linear model predicting twists, rather than changes in pose
+- No point: the only difference is a scaling factor (to roll out a twist, we just multiply it by dt)
+- Maybe we could roll out twists in a more sophisticated manner, but I think this would be more like
+    rolling out *accelerations* where we take the cmd_vel and instead predict its effect on acceleration?
