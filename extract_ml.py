@@ -1,4 +1,4 @@
-#!/home/nhatch2/miniconda3/bin/python3
+#!/usr/bin/env python3
 
 import csv
 import sys

@@ -1,4 +1,4 @@
-#!/home/nhatch2/miniconda3/bin/python3
+#!/usr/bin/env python3
 
 # Don't run training if unit tests fail
 import unit_test
@@ -120,4 +120,13 @@ if __name__ == "__main__":
     plt.legend()
     plt.axis('equal')
     plt.savefig('out.png')
+
+    plt.clf()
+    plt.axis('equal')
+    x,y = linear_model.concat_seqs(seqs,1)
+    plt.xlabel("Commanded heading rate (rad/s)")
+    plt.ylabel("Actual heading rate (rad/s)")
+    # Note: I don't think the indices 1 and 2 are correct except for the `sim_data` dataset
+    plt.scatter(x[:,1],y[:,2]*10)
+    plt.savefig('z_vs_zcmd_out.png')
 
