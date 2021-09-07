@@ -10,9 +10,16 @@ if len(sys.argv) < 2:
     sys.exit(0)
 target = sys.argv[1]
 
-cmd_vel_file = open('datasets/' + target + '/cmd_vel.txt', newline='')
+is_ackermann = False
+try:
+    cmd_vel_file = open('datasets/' + target + '/cmd_vel.txt', newline='')
+    control_reader = csv.DictReader(cmd_vel_file)
+except FileNotFoundError:
+    is_ackermann = True
+    vinput_file = open('datasets/' + target + '/input.txt', newline='')
+    control_reader = csv.DictReader(vinput_file)
+
 gt_pose_file = open('datasets/' + target + '/gt_pose.txt', newline='')
-cmd_vel_reader = csv.DictReader(cmd_vel_file)
 gt_pose_reader = csv.DictReader(gt_pose_file)
 
 has_twist = True
@@ -26,7 +33,7 @@ except FileNotFoundError:
 
 data = []
 
-prev_cmd_vel_time = 0
+prev_control_time = 0
 
 def pose_difference(p2, p1):
     r1 = trf.Rotation.from_quat(p1[3:])
@@ -60,6 +67,12 @@ seq_no = 0
 cmd_vel_fields = [
         'field.linear.x',
         'field.angular.z']
+
+vinput_fields = [
+        'field.steer',
+        'field.throttle',
+        'field.brake',
+        'field.automatic_gear']
 
 # These are in the robot base frame, not the world frame.
 odom_twist_fields = [
@@ -95,48 +108,83 @@ def planar_twist(twist, pose):
     return np.array([linear_vel, transverse_vel, twist[5]])
 
 num_zero = 0
-for row in cmd_vel_reader:
-    cmd_vel_time = int(row['%time'])
-    cmd_vel = get_fields(row, cmd_vel_fields)
+total_seq_time = 0
+total_seq_steps = 0
+in_brake_phase = False
+for row in control_reader:
+    control_time = int(row['%time'])
+    if is_ackermann:
+        control_raw = get_fields(row, vinput_fields)
+        control = control_raw[:3]
+        if control_raw[3] == 2:
+            # TODO this way of handling forward/reverse assumes that whenever
+            # our forward velocity is positive, we are in "drive"; and whenever
+            # negative, we're in "reverse". Is that assumption valid? E.g. when
+            # slipping downhill? It might not matter if we're not turning.
+            control *= -1
+        elif control_raw[3] != 4:
+            print("ERROR: Control gear {} was not 2 or 4".format(int(control_raw[3])))
+            sys.exit(1)
+        if control_raw[2] == 0.5 and control_raw[0] == 0.0:
+            # We're in the braking phase at the end of the sequence
+            in_brake_phase = True
+            continue
+        elif in_brake_phase:
+                print("Average step length for this seq: {:.3f}".format(
+                    total_seq_time / total_seq_steps))
+                in_brake_phase = False
+                seq_no += 1
+                total_seq_time = 0
+                total_seq_steps = 0
+    else:
+        control = get_fields(row, cmd_vel_fields)
 
     # sanity check this was 100ms
-    time_diff = (cmd_vel_time - prev_cmd_vel_time) // 1000000
+    time_diff = (control_time - prev_control_time) // 1000000
     if time_diff == 0:
         print("WARNING: Got time diff of zero, "
-            "cmd_vel {:.3f} {:.3f} vs previous {:.3f} {:.3f}".format(
-            cmd_vel[0], cmd_vel[1], data[-1][1], data[-1][2]))
+            "control {:.3f} {:.3f} vs previous {:.3f} {:.3f}".format(
+            control[0], control[1], data[-1][1], data[-1][2]))
         num_zero += 1
         # Let's assume whichever was later in the rosbag is the one that
         # actually got executed on the system.
         # TODO: Why is this happening? Should I collect cmd_vel_stamped?
-        data[-1][1] = cmd_vel[0]
-        data[-1][2] = cmd_vel[1]
+        data[-1][1] = control[0]
+        data[-1][2] = control[1]
         continue
-    elif time_diff != 100:
+    # For some reason the time diffs for the RZR are all over the place
+    # TODO figure out why.
+    elif (time_diff != 100 and not is_ackermann) or (time_diff > 200):
         print("WARNING: Weird time diff", time_diff)
         seq_no += 1
+    else:
+        total_seq_steps += 1
+        total_seq_time += time_diff
 
-    # There are many GT pose readings for each cmd_vel, so let's not
+    # There are many GT pose readings for each control, so let's not
     # worry about interpolating to try to synchronize these timestamps.
-    gt_pose = first_after(cmd_vel_time, gt_pose_fields, gt_pose_reader)
+    gt_pose = first_after(control_time, gt_pose_fields, gt_pose_reader)
 
     odom_twist = np.array([])
     planar_gt_twist = np.array([])
     if has_twist:
-        gt_twist = first_after(cmd_vel_time, gt_twist_fields, gt_twist_reader)
+        gt_twist = first_after(control_time, gt_twist_fields, gt_twist_reader)
         planar_gt_twist = planar_twist(gt_twist, gt_pose)
-        odom_twist = first_after(cmd_vel_time, odom_twist_fields, odom_reader)
+        odom_twist = first_after(control_time, odom_twist_fields, odom_reader)
 
-    data_row = np.concatenate([[seq_no], cmd_vel, odom_twist,
+    data_row = np.concatenate([[seq_no], control, odom_twist,
             planar_pose(gt_pose), planar_gt_twist])
     data.append(data_row)
 
-    prev_cmd_vel_time = cmd_vel_time
+    prev_control_time = control_time
 
 print("Got num zero:", num_zero)
 np.savetxt('datasets/' + target + '/np.txt', data)
 
-cmd_vel_file.close()
+if is_ackermann:
+    vinput_file.close()
+else:
+    cmd_vel_file.close()
 gt_pose_file.close()
 if has_twist:
     odom_file.close()
