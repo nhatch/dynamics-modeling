@@ -37,8 +37,15 @@ if __name__ == "__main__":
         else:
             seq = np.concatenate([seq, data], 0)
 
+    # Together, the total dimension of each training row is D+H+P
+    # D: the dimension of the control input
+    # H: the dimension of the odom information
+    # P: the dimension of the ground truth pose / twist information
+    # Different models in models.py can decide for themselves which of these are
+    # input and output (independent and dependent) variables.
+    is_ackermann = False
     if target == "sim_data":
-        D = 2
+        D = 2 # cmd_vel in the form dx, dtheta
         H = 0
         # P = 3 for poses (x, y, theta)
         P = 3
@@ -47,6 +54,11 @@ if __name__ == "__main__":
         # This also includes odom measurements of dx, dtheta
         H = 2
         # This also includes dx, dy, dtheta
+        P = 6
+    elif target == "rzr_sim":
+        is_ackermann = True
+        D = 3 # throttle, brake, steer (multiplied by -1 if we're in reverse)
+        H = 2
         P = 6
     else:
         print("Unknown target dataset")
@@ -93,6 +105,7 @@ if __name__ == "__main__":
     mean_score = mean_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
     print("Mean model:    ", mean_score)
 
+    # TODO do I make a new model type or add another param to these models?
     uni_model = UnicycleModel(D=D, H=H, P=P, delay_steps=1)
     uni_model.train(train_set, n_steps=N_TRAIN_STEPS)
     _, _, umx, umy = uni_model.compare_qualitative(
@@ -121,12 +134,13 @@ if __name__ == "__main__":
     plt.axis('equal')
     plt.savefig('out.png')
 
-    plt.clf()
-    plt.axis('equal')
-    x,y = linear_model.concat_seqs(seqs,1)
-    plt.xlabel("Commanded heading rate (rad/s)")
-    plt.ylabel("Actual heading rate (rad/s)")
-    # Note: I don't think the indices 1 and 2 are correct except for the `sim_data` dataset
-    plt.scatter(x[:,1],y[:,2]*10)
-    plt.savefig('z_vs_zcmd_out.png')
+    if not is_ackermann:
+        plt.clf()
+        plt.axis('equal')
+        x,y = linear_model.concat_seqs(seqs,1)
+        plt.xlabel("Commanded heading rate (rad/s)")
+        plt.ylabel("Actual heading rate (rad/s)")
+        # Note: I don't think the indices 1 and 2 are correct except for the `sim_data` dataset
+        plt.scatter(x[:,1],y[:,2]*10)
+        plt.savefig('z_vs_zcmd_out.png')
 

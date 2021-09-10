@@ -83,6 +83,7 @@ class LinearModel:
         for t in range(n_steps):
             curr_angles = preds[:,2]
             summand = one_steps[t:t+seq_len,:]
+            # TODO state for Ackermann vehicles should be 6D
             assert(summand.shape == (seq_len, 3))
             world_summand = np.zeros_like(summand)
             world_summand[:,0] = np.cos(curr_angles) * summand[:,0] - np.sin(curr_angles) * summand[:,1]
