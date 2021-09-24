@@ -172,6 +172,8 @@ for row in control_reader:
         planar_gt_twist = planar_twist(gt_twist, gt_pose)
         odom_twist = first_after(control_time, odom_twist_fields, odom_reader)
 
+    # TODO we need to do non-planar pose / twist. (Maybe in addition to planar,
+    # so we can do ablation testing.)
     data_row = np.concatenate([[seq_no], control, odom_twist,
             planar_pose(gt_pose), planar_gt_twist])
     data.append(data_row)
