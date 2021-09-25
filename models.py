@@ -97,7 +97,7 @@ class LinearModel:
     # - Only rolls out one sequence (for the entire length of one_steps, rather than seq_len seqs each of length n_steps)
     # - Starts from a given start state rather than 0,0,0
     # - Doesn't deal with delay_steps
-    def rollout_sequence(self, one_steps, start_state):
+    def rollout_single_sequence(self, one_steps, start_state):
         n_steps = one_steps.shape[0]
         seq = np.zeros((n_steps+1, one_steps.shape[1]))
         seq[0] = start_state

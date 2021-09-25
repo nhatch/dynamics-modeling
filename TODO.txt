@@ -15,7 +15,6 @@ Implement / train / evaluate recurrent model
 - Idea: include intermediate predictions of odom, motor power, filtered IMU estimates, ground truth pose, ground truth twist, etc. in the objective function. Encourage the model to be able to predict these from the hidden state.
 Port implementation of best Warthog model to Phoenix stack
 
-Collect RZR dataset
 Implement / train / evaluate bicycle model
 Port implementation of best model to Phoenix stack
 
