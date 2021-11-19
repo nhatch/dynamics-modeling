@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # Don't run training if unit tests fail
+from load_data import load_dataset
 import unit_test
 
 import sys
@@ -21,21 +22,7 @@ if __name__ == "__main__":
 
 
     #np.set_printoptions(precision=3, suppress=True)
-
-    X = np.loadtxt('datasets/' + target + '/np.txt')
-    N = X.shape[0]
-    seqs = []
-    seq = []
-    seq_no = 0
-    for row in X:
-        data = row[1:].reshape((1,-1))
-        if row[0] != seq_no:
-            if len(seq) > 1:
-                seqs.append(seq)
-            seq = data
-            seq_no = row[0]
-        else:
-            seq = np.concatenate([seq, data], 0)
+    seqs = load_dataset(target)
 
     # Together, the total dimension of each training row is D+H+P
     # D: the dimension of the control input
@@ -60,6 +47,11 @@ if __name__ == "__main__":
         D = 3 # throttle, brake, steer (multiplied by -1 if we're in reverse)
         H = 2
         P = 6
+    elif target == "rzr_sim_h5":
+        is_ackermann = True
+        D = 3 # throttle, brake, steer (multiplied by -1 if we're in reverse)
+        H = 6
+        P = 13
     else:
         print("Unknown target dataset")
         sys.exit(0)
@@ -87,7 +79,7 @@ if __name__ == "__main__":
     t_start = viz_start_idx-20 if viz_start_idx > 20 else 0
     t_end = viz_start_idx+n_steps+1
 
-    if P == 6:
+    if P in {6, 13}:
         gt_twist_model = GTTwistModel(D=D, H=H, P=P)
         gt_twist_score_pretraining = gt_twist_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
         _, _, gmx, gmy = gt_twist_model.compare_qualitative(
@@ -106,15 +98,16 @@ if __name__ == "__main__":
     print("Mean model:    ", mean_score)
 
     # TODO do I make a new model type or add another param to these models?
-    uni_model = UnicycleModel(D=D, H=H, P=P, delay_steps=1)
-    uni_model.train(train_set, n_steps=N_TRAIN_STEPS)
-    _, _, umx, umy = uni_model.compare_qualitative(
-            viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
-    line, = plt.plot(umx, umy, color='red', label='Unicycle model')
-    uni_score = uni_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
-    print("Unicycle model:", uni_score)
+    if D == 2:
+        uni_model = UnicycleModel(D=D, H=H, P=P, delay_steps=1)
+        uni_model.train(train_set, n_steps=N_TRAIN_STEPS)
+        _, _, umx, umy = uni_model.compare_qualitative(
+                viz_seq, start_idx=viz_start_idx, n_steps=n_steps)
+        line, = plt.plot(umx, umy, color='red', label='Unicycle model')
+        uni_score = uni_model.evaluate(test_set, n_steps=N_EVAL_STEPS)
+        print("Unicycle model:", uni_score)
 
-    linear_model = LinearModel(D=D, H=H, P=P, delay_steps=1)
+    linear_model = LinearModel(D=D, H=H, P=P, delay_steps=1, lambda_=1e-2)
     linear_model.train(train_set, n_steps=N_TRAIN_STEPS)
     tx, ty, mx, my = linear_model.compare_qualitative(
             viz_seq, start_idx=viz_start_idx, n_steps=n_steps)

@@ -11,7 +11,7 @@ WEIGHTS = np.array([10,10,100])
 # I think we don't want an affine model, since for zero input
 # we should actually get zero output.
 class LinearModel:
-    def __init__(self, D, H, P, delay_steps):
+    def __init__(self, D, H, P, delay_steps, lambda_: float = 0.0):
         self.w = None
         self.train_n_steps = None
         self.delay_steps = delay_steps
@@ -19,6 +19,7 @@ class LinearModel:
         self.features_to_predict = np.zeros(D+H+P, dtype=np.bool)
         self.features_to_use[:D] = True
         self.features_to_predict[D+H:D+H+3] = True
+        self.lambda_ = lambda_
 
     def relative_pose(self, query_pose, reference_pose):
         diff = query_pose - reference_pose
@@ -66,7 +67,10 @@ class LinearModel:
         weighted_y = train_y * WEIGHTS
         assert(weighted_y.shape == train_y.shape)
         assert(len(train_x) == len(train_y))
-        weighted_w = np.linalg.solve(train_x.T @ train_x, train_x.T @ weighted_y)
+        weighted_w = np.linalg.solve(
+            train_x.T @ train_x + self.lambda_ * np.eye(train_x.shape[1]),
+            train_x.T @ weighted_y,
+        )
 
         assert(weighted_w.shape == (train_x.shape[1], weighted_y.shape[1]))
         self.w = weighted_w / WEIGHTS
@@ -186,7 +190,6 @@ class UnicycleModel(LinearModel):
 class GTTwistModel(LinearModel):
     def __init__(self, D, H, P):
         super().__init__(D, H, P, 0)
-        assert(P == 6)
         self.features_to_use = np.zeros(D+H+P, dtype=np.bool)
         self.features_to_use[-3:] = True
         self.train_n_steps = 1
