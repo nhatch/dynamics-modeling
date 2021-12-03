@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from models import LinearModel
+from src.models.models import LinearModel
 
 D = 4
 

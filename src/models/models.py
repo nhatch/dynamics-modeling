@@ -27,7 +27,9 @@ class LinearModel:
         direction = np.arctan2(diff[:,1], diff[:,0])
         relative_direction = direction - reference_pose[:,2]
         angle_diff = diff[:,2]
+        # NOTE: I do not understand minimized diff
         minimized_angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
+        # NOTE: Why not just [diff[:, :2], minimized angle diff]
         return np.array([distance*np.cos(relative_direction),
                          distance*np.sin(relative_direction),
                          minimized_angle_diff]).T
@@ -71,8 +73,11 @@ class LinearModel:
             train_x.T @ train_x + self.lambda_ * np.eye(train_x.shape[1]),
             train_x.T @ weighted_y,
         )
+        print(f"Train x: {train_x.shape}")
+        print(f"Train y: {train_y.shape}")
 
         assert(weighted_w.shape == (train_x.shape[1], weighted_y.shape[1]))
+        # NOTE: Why / WEIGHTS?
         self.w = weighted_w / WEIGHTS
         assert(self.w.shape == weighted_w.shape)
 

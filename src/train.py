@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 
 # Don't run training if unit tests fail
-from load_data import load_dataset
-import unit_test
 
 import sys
 import numpy as np
-from models import *
 import matplotlib.pyplot as plt
+
+if __name__ == "__main__":
+    from models.models import *
+    from data_utils.load_data import load_dataset
+else:
+    from .models.models import *
+    from .data_utils.load_data import load_dataset
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -42,7 +46,7 @@ if __name__ == "__main__":
         H = 2
         # This also includes dx, dy, dtheta
         P = 6
-    elif target == "rzr_sim":
+    elif target.startswith("rzr_sim"):
         is_ackermann = True
         D = 3 # throttle, brake, steer (multiplied by -1 if we're in reverse)
         H = 2
