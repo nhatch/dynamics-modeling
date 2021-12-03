@@ -17,7 +17,10 @@ def gear_to_multiplier(gearbox_gear, gearbox_mode):
         return mode_to_direction_dict[int(a)]
     mode_to_dir = np.vectorize(mode_to_dir_iter)
 
-    return gearbox_gear * mode_to_dir(gearbox_mode)
+    # FIXME: They should match a bunch, but lead to very different performances.
+
+    # return mode_to_dir(gearbox_mode)
+    return gearbox_gear
 
 
 def hdf5_extract_data(dataset_name: str, h5_file: h5.File):
@@ -29,15 +32,18 @@ def hdf5_extract_data(dataset_name: str, h5_file: h5.File):
         sim_data_raw = []
 
         # D (control)
-        topics_control = ["input_pair/control/steer", "input_pair/control/brake", "input_pair/control/throttle"]
+        topics_control = ["input_pair/control/steer", "input_pair/control/throttle", "input_pair/control/brake",]
         for topic in topics_control:
             sim_data_raw.append(h5_file[topic][:])
 
-        # Map throttle to proper direction
-        sim_data_raw[1] *= gear_to_multiplier(
+
+        # Map steer, throttle to proper direction
+        direction = gear_to_multiplier(
             h5_file["synced_vehicle_input_state/state/gearbox_gear"][:],
             h5_file["synced_vehicle_input_state/state/gearbox_mode"][:]
         )
+        sim_data_raw[1] *= direction
+        sim_data_raw[0] *= direction
 
         # TODO: Should we do anything "breaking phase" here?
 
