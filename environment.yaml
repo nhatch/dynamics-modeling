@@ -1,8 +1,12 @@
 name: dynamics-modeling
 channels:
+  - conda-forge
+  - pytorch
   - defaults
 dependencies:
   - matplotlib
   - numpy
   - scikit-learn
   - h5py
+  - pytorch
+  - torchvision
