@@ -17,7 +17,7 @@ def gear_to_multiplier(gearbox_gear, gearbox_mode):
         return mode_to_direction_dict[int(a)]
     mode_to_dir = np.vectorize(mode_to_dir_iter)
 
-    # FIXME: They should match a bunch, but lead to very different performances.
+    # FIXME: They should match on majority of experiments, but lead to very different performances.
 
     # return mode_to_dir(gearbox_mode)
     return gearbox_gear
@@ -47,11 +47,11 @@ def hdf5_extract_data(dataset_name: str, h5_file: h5.File):
 
         # TODO: Should we do anything "breaking phase" here?
 
-        # P (state)
+        # H (state)
         sim_data_raw.append(h5_file["input_pair/state/twist/linear"][:, 0])  # linear.x
         sim_data_raw.append(h5_file["input_pair/state/twist/angular"][:, 2])  # angular.z
 
-        # H (ground truth)
+        # P (ground truth)
         # FIXME: We should actually record ground truth in the simulation in HDF5
 
         def planar_pose(pose: np.ndarray) -> np.ndarray:
