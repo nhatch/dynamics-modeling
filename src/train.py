@@ -7,10 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    from models.models import *
+    from models import *
     from data_utils.load_data import load_dataset
 else:
-    from .models.models import *
+    from .models import *
     from .data_utils.load_data import load_dataset
 
 if __name__ == "__main__":
