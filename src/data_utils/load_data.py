@@ -4,8 +4,12 @@ from pathlib import Path
 from .hdf5_processing import hdf5_extract_data
 
 def load_dataset(dataset_name: str):
-    try:
-        X = np.loadtxt('datasets/' + dataset_name + '/np.txt')
+    data_folder = Path("datasets") / dataset_name
+    result = []
+
+    # Numpy processing
+    for numpy_path in data_folder.rglob("np.txt"):
+        X = np.loadtxt(numpy_path)
         N = X.shape[0]
         seqs = []
         seq = []
@@ -19,22 +23,16 @@ def load_dataset(dataset_name: str):
                 seq_no = row[0]
             else:
                 seq = np.concatenate([seq, data], 0)
-        return seqs
-    except OSError as e:
-        # dataset not found
-        # Try h5py
-        data_folder = Path("datasets") / dataset_name
-        # Glob only supports wildcards not regex
-        file_paths = list(data_folder.glob("*.h5")) + list(data_folder.glob("*.hdf5"))
+        result.extend(seqs)
 
-        seqs = []
+    # HDF5 Processing
+    for file_path in list(data_folder.rglob("*.h5")) + list(data_folder.rglob("*.hdf5")):
+        with h5.File(file_path) as f:
+            result.extend(hdf5_extract_data(dataset_name, f))
 
-        for file_path in file_paths:
-            with h5.File(file_path) as f:
-                seqs.extend(hdf5_extract_data(dataset_name, f))
-        return seqs
-
-    except Exception as e:
+    if not result:
         raise ValueError(
             f"Dataset: {dataset_name} not found. Ensure that is a folder under \'datasets/\' directory"
         )
+
+    return result
