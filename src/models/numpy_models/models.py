@@ -27,9 +27,7 @@ class LinearModel:
         direction = np.arctan2(diff[:,1], diff[:,0])
         relative_direction = direction - reference_pose[:,2]
         angle_diff = diff[:,2]
-        # NOTE: I do not understand minimized diff
         minimized_angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))
-        # NOTE: Why not just [diff[:, :2], minimized angle diff]
         return np.array([distance*np.cos(relative_direction),
                          distance*np.sin(relative_direction),
                          minimized_angle_diff]).T
