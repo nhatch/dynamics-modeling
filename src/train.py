@@ -12,11 +12,13 @@ if __name__ == "__main__":
     from models import *
     from models.torch_models.models import train as torch_train
     from models.torch_models.models import evaluate as torch_evaluate
+    from models.torch_models.models import compare_qualitative as torch_compare_qualitative
     from data_utils import load_dataset, SequenceDataset
 else:
     from .models import *
     from .models.torch_models.models import train as torch_train
     from .models.torch_models.models import evaluate as torch_evaluate
+    from models.torch_models.models import compare_qualitative as torch_compare_qualitative
     from .data_utils import load_dataset, SequenceDataset
 
 if __name__ == "__main__":
@@ -174,3 +176,22 @@ if __name__ == "__main__":
         epochs=30,
         device="cpu",
     )
+
+    # Plot Path
+    with torch.no_grad():
+        tx, ty, mx, my = torch_compare_qualitative(
+            model=model,
+            xx=torch.from_numpy(viz_seq[:, x_features]).float(),
+            yy=torch.from_numpy(viz_seq[:, y_features]).float(),
+            start_idx=viz_start_idx,
+            n_steps=n_steps,
+            delay_steps=1,
+        )
+    plt.cla()
+    plt.clf()
+    line, = plt.plot(tx[t_start:t_end], ty[t_start:t_end], color='black', label='Ground truth')
+    line, = plt.plot(mx, my, color='blue', label='Torch linear model')
+    line, = plt.plot(gmx, gmy, color='green', label='Rollout ground truth twist')
+    plt.legend()
+    plt.axis('equal')
+    plt.savefig("torch_out.png")
