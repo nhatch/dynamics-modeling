@@ -71,8 +71,11 @@ class LinearModel:
             train_x.T @ train_x + self.lambda_ * np.eye(train_x.shape[1]),
             train_x.T @ weighted_y,
         )
+        print(f"Train x: {train_x.shape}")
+        print(f"Train y: {train_y.shape}")
 
         assert(weighted_w.shape == (train_x.shape[1], weighted_y.shape[1]))
+        # NOTE: Why / WEIGHTS?
         self.w = weighted_w / WEIGHTS
         assert(self.w.shape == weighted_w.shape)
 

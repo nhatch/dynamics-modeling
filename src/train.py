@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 
 # Don't run training if unit tests fail
-from load_data import load_dataset
-import unit_test
 
 import sys
 import numpy as np
-from models import *
+import torch
 import matplotlib.pyplot as plt
+from torch.utils.data.dataloader import DataLoader
+
+if __name__ == "__main__":
+    from models import *
+    from models.torch_models.models import train as torch_train
+    from models.torch_models.models import evaluate as torch_evaluate
+    from data_utils import load_dataset, SequenceDataset
+else:
+    from .models import *
+    from .models.torch_models.models import train as torch_train
+    from .models.torch_models.models import evaluate as torch_evaluate
+    from .data_utils import load_dataset, SequenceDataset
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -42,16 +52,11 @@ if __name__ == "__main__":
         H = 2
         # This also includes dx, dy, dtheta
         P = 6
-    elif target == "rzr_sim":
+    elif target.startswith("rzr_"):
         is_ackermann = True
         D = 3 # throttle, brake, steer (multiplied by -1 if we're in reverse)
         H = 2
         P = 6
-    elif target == "rzr_sim_h5":
-        is_ackermann = True
-        D = 3 # throttle, brake, steer (multiplied by -1 if we're in reverse)
-        H = 6
-        P = 13
     else:
         print("Unknown target dataset")
         sys.exit(0)
@@ -137,3 +142,30 @@ if __name__ == "__main__":
         plt.scatter(x[:,1],y[:,2]*10)
         plt.savefig('z_vs_zcmd_out.png')
 
+    # Train simple torch model
+    x_features = torch.zeros((D + H + P), dtype=torch.bool)
+    x_features[:D] = True
+    y_features = torch.zeros((D + H + P), dtype=torch.bool)
+    y_features[D + H:D + H + 3] = True
+    train_loader = DataLoader(
+        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_TRAIN_STEPS)
+    )
+    val_loader = DataLoader(
+        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_EVAL_STEPS)
+    )
+    model = torch.nn.Sequential(
+        torch.nn.Linear(D, 16),
+        torch.nn.Sigmoid(),
+        torch.nn.Linear(16, 16),
+        torch.nn.Sigmoid(),
+        torch.nn.Linear(16, 3),
+    )
+    torch_train(
+        model=model,
+        optimizer=torch.optim.Adam(model.parameters()),
+        criterion=torch.nn.MSELoss(),
+        train_loader=train_loader,
+        val_loader=val_loader,
+        epochs=30,
+        device="cpu",
+    )
