@@ -1,10 +1,10 @@
 name: dynamics-modeling
 channels:
-  - conda-forge
   - pytorch
+  - conda-forge
   - defaults
 dependencies:
-  - python=3.8
+  - python=3.9  # Current requirement for ros-roslz4
   - matplotlib
   - numpy
   - scikit-learn
@@ -12,4 +12,12 @@ dependencies:
   - pytorch
   - torchvision
   - tqdm
-  - ros-rosbag
+  - ros-roslz4
+  - pyyaml
+  - pip
+  - pip:
+    # rosbag that's cool with python 3.9, but apparently doesn't list dependencies, so these are appended to the end of this pip list
+    - rosbag --extra-index-url https://rospypi.github.io/simple/
+    - rospkg --extra-index-url https://rospypi.github.io/simple/
+    - pycryptodomex
+    - python-gnupg
