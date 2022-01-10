@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
 
     #np.set_printoptions(precision=3, suppress=True)
-    seqs = load_dataset(target)
+    seqs, time_seqs = load_dataset(target)
 
     # Together, the total dimension of each training row is D+H+P
     # D: the dimension of the control input
@@ -68,9 +68,15 @@ if __name__ == "__main__":
     test_N_SEQS = N_SEQS - train_N_SEQS
     assert(test_N_SEQS > 0)
 
-    assert(seqs[0].shape[1] == D+H+P)
+    assert seqs[0].shape[1] == D+H+P, \
+        f"Expected shape of each element of each sequence to be {D+H+P} but got {seqs[0].shape[1]}"
     train_set = seqs[:train_N_SEQS]
     test_set = seqs[train_N_SEQS:]
+    train_time_set = None
+    test_time_set = None
+    if time_seqs is not None:
+        train_time_set = time_seqs[:train_N_SEQS]
+        test_time_set = time_seqs[train_N_SEQS:]
 
     print("first train seq shape:", train_set[0].shape)
     print("first test seq shape:", test_set[0].shape)
@@ -148,10 +154,10 @@ if __name__ == "__main__":
     y_features = torch.zeros((D + H + P), dtype=torch.bool)
     y_features[D + H:D + H + 3] = True
     train_loader = DataLoader(
-        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_TRAIN_STEPS)
+        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_TRAIN_STEPS, time_data=train_time_set)
     )
     val_loader = DataLoader(
-        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_EVAL_STEPS)
+        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_EVAL_STEPS, time_data=test_time_set)
     )
     model = torch.nn.Sequential(
         torch.nn.Linear(D, 16),

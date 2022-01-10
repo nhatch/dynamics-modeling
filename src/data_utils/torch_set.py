@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple, Union
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -11,19 +11,31 @@ class SequenceDataset(Dataset):
         y_features: np.ndarray,
         delay_steps: int = 1,
         n_steps: int = 1,
+        time_data: Optional[List[np.ndarray]] = None,
     ) -> None:
         super().__init__()
 
-        x, y = self.__class__._rollout_sequences(seqs, x_features, y_features, delay_steps, n_steps)
+        if time_data is not None:
+            assert (
+                len(seqs) == len(time_data),
+                "Time data and sequences do not have the same length."
+            )
+            assert (
+                all([len(x) == len(y) for x, y in zip(seqs, time_data)]),
+                "Some sequence is not aligned between time data and raw sequences."
+            )
+
+        x, y, t = self.__class__._rollout_sequences(seqs, x_features, y_features, delay_steps, n_steps, time_data)
 
         self.x = torch.from_numpy(x)
         self.y = torch.from_numpy(y)
+        self.t = torch.from_numpy(t)
 
     def __len__(self) -> int:
         return len(self.x)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self.x[index], self.y[index]
+        return self.x[index], self.y[index], self.t[index]
 
     @staticmethod
     def _relative_pose(query_pose: np.ndarray, reference_pose: np.ndarray) -> np.ndarray:
@@ -46,21 +58,28 @@ class SequenceDataset(Dataset):
         y_features: np.ndarray,
         delay_steps: int,
         n_steps: int = 1,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        time_data: Optional[List[np.ndarray]] = None,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         seqs_len = 0
         # Pre-allocate arrays
         for s in seqs:
             seqs_len += len(s) - n_steps - delay_steps
         x_seqs = np.zeros((seqs_len, x_features.sum()), dtype=np.float32)
         y_seqs = np.zeros((seqs_len, y_features.sum()), dtype=np.float32)
+        t_seqs = np.zeros((seqs_len,), dtype=np.float32)
 
         # Process data
         seqs_so_far = 0
-        for s in seqs:
+        for s_i, s in enumerate(seqs):
             # Get data for sequence
             s_len = len(s) - n_steps - delay_steps
             x_s = s[:s_len, x_features]
             y_s = s[:, y_features]
+
+            if time_data is None:
+                t_s = np.ones(s_len)
+            else:
+                t_s = time_data[s_i][n_steps + delay_steps:] - time_data[s_i][:s_len]
 
             # Get target y
             relative_targets = SequenceDataset._relative_pose(y_s[n_steps:], y_s[:-n_steps])
@@ -69,6 +88,7 @@ class SequenceDataset(Dataset):
             # Append to result
             x_seqs[seqs_so_far:seqs_so_far + s_len] = x_s
             y_seqs[seqs_so_far:seqs_so_far + s_len] = y_s
+            t_seqs[seqs_so_far:seqs_so_far + s_len] = t_s
             seqs_so_far += s_len
 
-        return x_seqs, y_seqs
+        return x_seqs, y_seqs, t_seqs

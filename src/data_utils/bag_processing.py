@@ -68,7 +68,10 @@ def bag_extract_data(dataset_name: str, bag_file_path: Union[str, Path]):
 
     # Process data
     result = []
+    result_time = []
+
     seq_raw = []  # Current sequence
+    time_seq = []  # Time of sequences -- For use in training with time dependence
 
     # Input
     last_input_state_pair_to_log = []
@@ -106,13 +109,16 @@ def bag_extract_data(dataset_name: str, bag_file_path: Union[str, Path]):
                         last_gt_message.twist.twist.angular.z,
                     ]
                 )
+                time_seq.append(last_input_ts.to_sec())
 
                 # Check if sequence should be closed (Diff > 0.15s)
                 # TODO: Make an argument
                 if (ts - last_input_ts).to_sec() > 0.15:
                     # Add sequence to result
                     result.append(process_raw_sequence(seq_raw))
+                    result_time.append(time_seq)
                     seq_raw = []
+                    time_seq = []
 
             # Save current ts/msg for next iter
             if last_state_message is not None:
@@ -129,4 +135,4 @@ def bag_extract_data(dataset_name: str, bag_file_path: Union[str, Path]):
         result.append(process_raw_sequence(seq_raw))
 
     bag.close()
-    return result
+    return result, result_time

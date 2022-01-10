@@ -7,6 +7,7 @@ from .hdf5_processing import hdf5_extract_data
 def load_dataset(dataset_name: str):
     data_folder = Path("datasets") / dataset_name
     result = []
+    time_result = []
 
     # Numpy processing
     for numpy_path in data_folder.rglob("np.txt"):
@@ -33,7 +34,9 @@ def load_dataset(dataset_name: str):
 
     # Bag Processing
     for file_path in data_folder.rglob("*.bag"):
-        result.extend(bag_extract_data(dataset_name, file_path))
+        seqs, time_seqs = bag_extract_data(dataset_name, file_path)
+        result.extend(seqs)
+        time_result.extend(time_seqs)
 
 
     if not result:
@@ -41,4 +44,8 @@ def load_dataset(dataset_name: str):
             f"Dataset: {dataset_name} not found. Ensure that is a folder under \'datasets/\' directory"
         )
 
-    return result
+    # TODO: This should be based on a parameter. rn just a simple check
+    if len(result) == len(time_result):
+        return result, time_result
+    else:
+        return result, None

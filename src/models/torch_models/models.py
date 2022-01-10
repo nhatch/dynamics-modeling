@@ -14,9 +14,9 @@ def evaluate(
 ):
     with torch.no_grad():
         running_loss = 0.0
-        for x, y in tqdm(loader, disable=not verbose, leave=False):
-            x, y = x.to(device), y.to(device)
-            y_pred = model(x)
+        for x, y, t in tqdm(loader, disable=not verbose, leave=False):
+            x, y, t = x.to(device), y.to(device), t.to(device)
+            y_pred = model(x) * t
             running_loss += criterion(y_pred, y).cpu().item()
 
     return running_loss / len(loader)
@@ -49,9 +49,9 @@ def train(
 
     for epoch in trange(epochs, disable=not verbose, leave=False):
         train_running_loss = 0.0
-        for x, y in tqdm(train_loader, disable=not verbose):
-            x, y = x.to(device), y.to(device)
-            y_pred = model(x)
+        for x, y, t in tqdm(train_loader, disable=not verbose):
+            x, y, t = x.to(device), y.to(device), t.to(device)
+            y_pred = model(x) * t
             loss = criterion(y_pred, y)
 
             optimizer.zero_grad()
