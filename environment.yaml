@@ -12,12 +12,15 @@ dependencies:
   - pytorch
   - torchvision
   - tqdm
-  - ros-roslz4
   - pyyaml
+  - scipy
   - pip
   - pip:
-    # rosbag that's cool with python 3.9, but apparently doesn't list dependencies, so these are appended to the end of this pip list
-    - rosbag --extra-index-url https://rospypi.github.io/simple/
-    - rospkg --extra-index-url https://rospypi.github.io/simple/
+    - --extra-index-url https://rospypi.github.io/simple/
+    # Messages
+    - rospy-all
+    - rosbag
+    # rosbag apparently doesn't list dependencies, so these are appended to the end of this pip list
     - pycryptodomex
     - python-gnupg
+    - tensorboard

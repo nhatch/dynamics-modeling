@@ -29,10 +29,6 @@ def compare_qualitative():
     raise NotImplementedError()
 
 
-def rollout_single_sequence():
-    raise NotImplementedError()
-
-
 def train(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,

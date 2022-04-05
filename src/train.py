@@ -12,12 +12,14 @@ if __name__ == "__main__":
     from models import *
     from models.torch_models.models import train as torch_train
     from models.torch_models.models import evaluate as torch_evaluate
-    from data_utils import load_dataset, SequenceDataset
+    from data_utils import load_dataset
+    from data_utils.datasets.torch_lookahead_diff import LookaheadSequenceDataset
 else:
     from .models import *
     from .models.torch_models.models import train as torch_train
     from .models.torch_models.models import evaluate as torch_evaluate
-    from .data_utils import load_dataset, SequenceDataset
+    from .data_utils import load_dataset
+    from .data_utils.datasets.torch_lookahead_diff import LookaheadSequenceDataset
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -154,10 +156,10 @@ if __name__ == "__main__":
     y_features = torch.zeros((D + H + P), dtype=torch.bool)
     y_features[D + H:D + H + 3] = True
     train_loader = DataLoader(
-        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_TRAIN_STEPS, time_data=train_time_set)
+        LookaheadSequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_TRAIN_STEPS, time_data=train_time_set)
     )
     val_loader = DataLoader(
-        SequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_EVAL_STEPS, time_data=test_time_set)
+        LookaheadSequenceDataset(train_set, x_features, y_features, delay_steps=1, n_steps=N_EVAL_STEPS, time_data=test_time_set)
     )
     model = torch.nn.Sequential(
         torch.nn.Linear(D, 16),
