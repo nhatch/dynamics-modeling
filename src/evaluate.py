@@ -1,8 +1,11 @@
+import argparse
 import numpy as np
 import torch
-from data_utils.bag_processing.sequence_readers import ASyncSequenceReader
-from data_utils.bag_processing.filters import ForwardFilter, PIDInfoFilter
-from data_utils.datasets.torch_lookahead import LookaheadSequenceDataset
+
+from rosbag2torch.bag_processing.sequence_readers import ASyncSequenceReader
+
+from rosbag2torch.bag_processing.filters import ForwardFilter, PIDInfoFilter
+from rosbag2torch import LookaheadSequenceDataset
 from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
@@ -21,17 +24,25 @@ def unroll_y(y: np.ndarray, t: np.ndarray):
     return np.cumsum(np.array(along_vecs), axis=0)
 
 def main():
-    model = torch.jit.load('model_scripted.pt')
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('bag_path', nargs=1, type=str, help="Path to bag file to evaluate model on.")
+    parser.add_argument('model', nargs=1, type=str, help="Path to model file to evaluate. Should be a torch.jit.scripted .pt file.")
+
+    args = parser.parse_args()
+
+    model = torch.jit.load(args.model[0])
     model.eval()
 
-    x_features = ["state", "control"]
+    # x_features = ["state", "control"]
+    x_features = ["control", "state"]
     y_features = ["target"]
 
     filters = [ForwardFilter(), PIDInfoFilter()]
 
     reader = ASyncSequenceReader(x_features + y_features, features_to_record_on=y_features, filters=filters)
 
-    reader.extract_bag_data("datasets/rzr_real/auton_medium_2022-02-24-21-28-04.bag")
+    reader.extract_bag_data(args.bag_path[0])
 
     # Eval sequence is the longest from among sequences
     eval_seq = None
@@ -42,7 +53,7 @@ def main():
             eval_seq = seq
             eval_seq_len = len(seq[key])
 
-    dataset = LookaheadSequenceDataset([eval_seq], x_features, y_features, delay_steps=0, n_steps=1)
+    dataset = LookaheadSequenceDataset([eval_seq], x_features, y_features, delay_steps=1)
 
     data_loader = DataLoader(dataset, batch_size=100, shuffle=False)
 
@@ -51,18 +62,27 @@ def main():
     ts_all = []
 
     for batch in data_loader:
-        x, y, t = batch
-        y_pred = model(x) * t
+        x, y, dt = batch
+        y_pred = model(x) * dt + x[:, -2:]
 
         y_pred_all.extend(y_pred.detach().numpy())
         y_true_all.extend(y.detach().numpy())
-        ts_all.extend(t.detach().numpy())
+        ts_all.extend(dt.detach().numpy())
 
     y_pred_all = np.array(y_pred_all)
     y_true_all = np.array(y_true_all)
+
+    print(f"Average MSE: {np.mean(np.square(y_pred_all - y_true_all))}")
     ts_all = np.array(ts_all)
 
-    fig, axs = plt.subplots(2, 2)
+    fig, axs = plt.subplots(2, 2, sharey="col")
+
+    # Smoothen the data
+    smooth_dx = True
+    if smooth_dx:
+        from scipy.signal import savgol_filter
+        y_pred_all[:, 0] = savgol_filter(y_pred_all[:, 0], window_length=31, polyorder=3, axis=0, mode="nearest")
+
     for ax_row, y, title in zip(axs, [y_pred_all, y_true_all], ["pred", "true"]):
         ax_row[0].plot(np.cumsum(ts_all), y[:, 0])
         ax_row[0].set_title(f"{title} - dx")

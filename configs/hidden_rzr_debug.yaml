@@ -1,0 +1,36 @@
+dataset:
+  train_name: rzr_real_debug  # Name of folder under datasets/ with bags of interest
+  val_name: rzr_real_debug_val  # OPTIONAL. Name of folder under datasets/ with bags to be used for validation
+  reader:
+    type: async  # TODO: Add reader parsing
+    args:
+      features_to_record_on: [control]
+  filters:
+    - forward
+    - pid_info
+  train_ratio: 0.8  # How much of data to use for train. Rest is used for validation. Should be [0, 1]
+  type: torch_lookahead
+  args:
+    delay_steps: 1  # How many steps to predict into the future with
+  # This is done on sequences.
+
+features:
+  x:
+    - state
+    - control
+  y:
+    - target
+
+model:
+  type: hidden-2-relu
+  save_prefix: hidden_async
+
+robot:
+  type: ackermann  # ackermann or skid; Type of robot model to use
+  # DEBUG: Above argument does not do anything. We can probably remove/ignore it.
+
+train_loop:
+  type: regression_train_loop
+  args:
+    epochs: 1500
+    verbose: True

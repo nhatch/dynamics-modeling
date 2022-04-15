@@ -32,13 +32,14 @@ Lastly the scripts `src/main.py` combines all of these building blocks into one 
 
 
 ## TODOs
-- [ ] Make validation/plotting pipeline. This requires a debug of current differential pose approach, and figuring out sync issues.
+- [ ] Make validation/plotting pipeline.
+- [x] Debug of current differential pose approach, and figuring out sync issues.
 - [ ] Verify that robot type argument is even necessary. If it is then make sure it's properly passed into data loading, models etc.
-- [ ] Add support for AutoRally style input/output.
+- [x] Add support for AutoRally style input/output.
 - [ ] DOCUMENTATION. More an ongoing task
-- [ ] Configuration files.
+- [x] Configuration files.
 - [ ] Invoke tasks for linting and testing(? See below)
 - [ ] Figure out some integration tests. Maybe a simple train loop
 - [ ] Move to GitLab
-- [ ] Split code into library and script. (For example models/datasets/parsing data should be in library, but loading args would in script)
+- [x] Split code into library and script. (For example datasets/parsing data should be in library, but loading args/models would in script)
 - [ ] Dask support for arrays bigger than memory? I don't think it will be an issue with dynamics-modeling (unless we do some stuff with elevation map), but it might be useful for other extractions.

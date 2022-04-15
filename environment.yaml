@@ -6,21 +6,13 @@ channels:
 dependencies:
   - python=3.9  # Current requirement for ros-roslz4
   - matplotlib
-  - numpy
   - scikit-learn
-  - h5py
-  - pytorch
-  - torchvision
   - tqdm
   - pyyaml
-  - scipy
   - pip
   - pip:
     - --extra-index-url https://rospypi.github.io/simple/
-    # Messages
-    - rospy-all
-    - rosbag
-    # rosbag apparently doesn't list dependencies, so these are appended to the end of this pip list
-    - pycryptodomex
-    - python-gnupg
+    - -e .
+    # Tensorboard
     - tensorboard
+    - torch-tb-profiler

@@ -47,39 +47,58 @@ def plot_preds_vs_gt(model, dataloader):
 
 
 def main():
-    spec = parse_args()
+    specs = parse_args()
 
-    model = load_model(spec["model"])
+    for spec in specs:
+        model = load_model(spec["model"]["type"])
 
-    data = load_dataset(
-        dataset_name=spec["dataset"],
-        x_features=model.x_features,
-        y_features=model.y_features,
-        robot_type=spec["robot"],
-        dataset_type=model.dataset_name,
-    )
+        train_data = load_dataset(
+            dataset_name=spec["dataset"]["train_name"],
+            config=spec,
+        )
 
-    if model.dataset_name == "numpy":
-        model = train_numpy(data, model)
-    elif model.dataset_name == "torch_lookahead":
-        import torch
-        from torch import optim, nn
-        from torch.utils.data import DataLoader
-        dl = DataLoader(data, batch_size=32, shuffle=False)
-        model = model()
 
-        train_torch_simple(model, optim.Adam(model.parameters()), dl, nn.MSELoss(), 200)
+        if model.dataset_name == "numpy":
+            model = train_numpy(train_data, model)
+        elif model.dataset_name == "torch_lookahead":
+            import torch
+            from torch import optim, nn
+            from torch.utils.data import DataLoader
 
-        model_scripted = torch.jit.script(model) # Export to TorchScript
-        model_scripted.save('model_scripted.pt') # Save
+            if "val_name" in spec["dataset"]:
+                val_data = load_dataset(
+                    dataset_name=spec["dataset"]["val_name"],
+                    config=spec,
+                )
+                val_dl = DataLoader(val_data, batch_size=32, shuffle=False)
 
-        plot_preds_vs_gt(model, dl)
+            dl = DataLoader(train_data, batch_size=32, shuffle=False)
+            model = model()
+
+            if spec["train_loop"]["type"] == "regression_train_loop":
+                train_torch_simple(
+                    model,
+                    optim.Adam(model.parameters()),
+                    dl,
+                    nn.MSELoss(),
+                    **spec["train_loop"]["args"],
+                    val_loader=val_dl if "val_dl" in vars() else None,
+                )
+            else:
+                raise ValueError()
+
+            if "save_prefix" in spec["model"]:
+                save_prefix = spec["model"].get("save_prefix")
+                model_scripted = torch.jit.script(model) # Export to TorchScript
+                model_scripted.save(f'{save_prefix}.pt') # Save
+
+            plot_preds_vs_gt(model, dl)
 
 
 if __name__ == "__main__":
-    from parse_args import parse_args
-    from data_utils import load_dataset
-    from models import load_model
-    from optimization_logic import train_numpy, train_torch_simple
+    from command_line.parse_args import parse_args
+    from command_line.data_utils import load_dataset
+    from command_line.models import load_model
+    from command_line.optimization_logic import train_numpy, train_torch_simple
 
     main()
