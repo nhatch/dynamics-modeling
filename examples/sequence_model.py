@@ -27,9 +27,9 @@ class Model(nn.Module):
         else:
             self._model = nn.Sequential(
                 nn.Linear(5, hidden_size),
-                nn.SELU(),
+                activation,
                 *[
-                    nn.Sequential(nn.Linear(hidden_size, hidden_size), nn.SELU())
+                    nn.Sequential(nn.Linear(hidden_size, hidden_size), activation)
                     for _ in range(num_hidden_layers - 1)
                 ],
                 nn.Linear(hidden_size, 2)
@@ -43,7 +43,7 @@ class ModelBaseline(nn.Module):
     def __init__(self) -> None:
         super().__init__()
     def forward(self, control: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
-        return state
+        return torch.zeros_like(state)
 
 
 def unroll_sequence_torch(
@@ -140,7 +140,7 @@ def train(
                         dts=dts
                     )
                     baseline_rollout_losses = []
-                    for rollout_idx, (pred, target) in enumerate(zip(predictions, targets.transpose(0, 1))):
+                    for rollout_idx, (pred, target) in enumerate(zip(baseline_predictions, targets.transpose(0, 1))):
                         loss = criterion(pred, target)
                         baseline_rollout_losses.append(loss)
                         # running_baseline_loss_rollout_steps[rollout_idx] += loss.detach().cpu().item()
@@ -155,9 +155,9 @@ def train(
         train_loss = running_total_loss / len(train_loader)
         train_baseline_loss = running_baseline_loss / len(train_loader)
         if writer is not None:
-            writer.add_scalar("Loss/train", train_loss, epoch)
+            writer.add_scalar("Loss/train total", train_loss, epoch)
             if model_baseline is not None:
-                writer.add_scalar("Loss/train baseline", train_baseline_loss, epoch)
+                writer.add_scalar("Loss/train total baseline", train_baseline_loss, epoch)
             for rollout_idx, rollout_loss in running_loss_rollout_steps.items():
                 writer.add_scalar(f"Loss/train @ rollout step {rollout_idx}", rollout_loss / len(train_loader), epoch)
         desc = f"Epochs Train Loss {train_loss:.4g} Baseline {train_baseline_loss:.4g}"
@@ -199,7 +199,7 @@ def train(
                             dts=dts
                         )
                         baseline_rollout_losses = []
-                        for rollout_idx, (pred, target) in enumerate(zip(predictions, targets.transpose(0, 1))):
+                        for rollout_idx, (pred, target) in enumerate(zip(baseline_predictions, targets.transpose(0, 1))):
                             loss = criterion(pred, target)
                             baseline_rollout_losses.append(loss)
                             # running_baseline_loss_rollout_steps[rollout_idx] += loss.detach().cpu().item()
@@ -212,9 +212,9 @@ def train(
                 val_loss = running_loss / len(val_loader)
                 val_baseline_loss = running_baseline_loss / len(val_loader)
                 if writer is not None:
-                    writer.add_scalar("Loss/val", val_loss, epoch)
+                    writer.add_scalar("Loss/val total", val_loss, epoch)
                     if model_baseline is not None:
-                        writer.add_scalar("Loss/val baseline", val_baseline_loss, epoch)
+                        writer.add_scalar("Loss/val total baseline", val_baseline_loss, epoch)
                     for rollout_idx, rollout_loss in running_loss_rollout_steps.items():
                         writer.add_scalar(f"Loss/val @ rollout step {rollout_idx}", rollout_loss / len(val_loader), epoch)
                 desc += f" Val Loss {val_loss:.4g} Baseline {val_baseline_loss:.4g}"
@@ -300,7 +300,8 @@ def get_world_frame_rollouts(model: nn.Module, states: torch.Tensor, controls: t
 
 def main():
     # "What to do" Parameters
-    TRAIN = False
+    TRAIN = True
+    PLOT_TRAIN = True
     PLOT_VAL = True
 
     # Sequence/Data Parameters
@@ -308,7 +309,7 @@ def main():
     ROLLOUT_S = 5  # seconds
 
     # Model Parameters
-    ACTIVATION_FN = nn.ReLU()
+    ACTIVATION_FN = nn.SELU()
     HIDDEN_SIZE = 64
     NUM_HIDDEN_LAYERS = 2
 
@@ -316,6 +317,9 @@ def main():
     EPOCHS = 50
     LR = 1e-3
     BATCH_SIZE = 32
+
+    DATASET_TRAIN = "datasets/rzr_sim"
+    DATASET_VAL = "datasets/rzr_real_val"
 
     # Suffix to use for saving this configuration. Shared for tensorboard and models
     settings_suffix = f"delay_{DELAY_STEPS}_rollout_{ROLLOUT_S}s_hidden_{HIDDEN_SIZE}_layers_{NUM_HIDDEN_LAYERS}_activation_{ACTIVATION_FN.__class__.__name__}_lr_{LR:.2e}_bs_{BATCH_SIZE}_epochs_{EPOCHS}"
@@ -345,10 +349,22 @@ def main():
             filters.PIDInfoFilter()
         ]
     )
+    train_reader = readers.FixedIntervalReader(
+        list(set(features + delayed_features)),
+        log_interval=1.0 / log_hz,
+        filters=[
+            filters.ForwardFilter()
+        ]
+    )
     rollout_len = int(ROLLOUT_S  * log_hz)
 
-    val_sequences = load_bags("datasets/rzr_real_val", reader)
+    val_sequences = load_bags(DATASET_VAL, reader)
     val_dataset = SequenceLookaheadDataset(val_sequences, features, delayed_features, delay_steps=DELAY_STEPS, sequence_length=rollout_len)
+    train_sequences = load_bags(DATASET_TRAIN, train_reader)
+    train_dataset = SequenceLookaheadDataset(
+        train_sequences, features, delayed_features, delay_steps=DELAY_STEPS, sequence_length=rollout_len
+    )
+
     model_prefix = f"models/sequence_model_{settings_suffix}"
 
 
@@ -357,17 +373,13 @@ def main():
         optimizer = optim.Adam(model.parameters(), weight_decay=0.01, lr=LR)
         criterion = nn.MSELoss()
 
-        train_sequences = load_bags("datasets/rzr_real", reader)
-        train_dataset = SequenceLookaheadDataset(
-            train_sequences, features, delayed_features, delay_steps=DELAY_STEPS, sequence_length=rollout_len
-        )
-
         writer = SummaryWriter(log_dir=f"runs/sequence_model_{settings_suffix}_{datetime.now().strftime('%b%d_%H-%M-%S')}")
 
         train(
             model=model,
             optimizer=optimizer,
             train_loader=DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True),
+            model_baseline=ModelBaseline(),
             criterion=criterion,
             epochs=EPOCHS,
             val_loader=DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True),
@@ -377,6 +389,32 @@ def main():
 
         torch.save(model.state_dict(), f"{model_prefix}_state_dict.pt")
         torch.jit.script(model).save(f"{model_prefix}_scripted.pt")
+
+    if PLOT_TRAIN:
+        with torch.no_grad():
+            if "model" not in vars():
+                model = Model(activation=ACTIVATION_FN, hidden_size=HIDDEN_SIZE, num_hidden_layers=NUM_HIDDEN_LAYERS)
+                model.load_state_dict(torch.load(f"{model_prefix}_state_dict.pt"))
+            model.eval()
+
+            controls, states, targets, dts = train_dataset.longest_rollout
+            poses_true, start_poses, poses_pred_all = get_world_frame_rollouts(model, states, controls, dts, rollout_in_seconds=ROLLOUT_S)
+
+            plt.scatter(start_poses[:, 0], start_poses[:, 1], color="red", marker="X")
+            plt.plot(poses_true[:, 0], poses_true[:, 1], color="red", label="True")
+            for idx, poses_pred in enumerate(poses_pred_all):
+                plt_kwargs = {"color": "black"}
+                if idx == 0:
+                    plt_kwargs["label"] = "Predicted"
+                plt.plot(poses_pred[:, 0], poses_pred[:, 1], **plt_kwargs)
+
+            plt.legend()
+            plt.xlabel("x")
+            plt.ylabel("y")
+            if not os.path.exists("plots"):
+                os.makedirs("plots")
+            plt.savefig(f"plots/sequence_model_train_{settings_suffix}.png", bbox_inches="tight")
+            plt.show()
 
     if PLOT_VAL:
         with torch.no_grad():

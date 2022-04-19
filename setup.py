@@ -3,7 +3,7 @@ import os
 from setuptools import find_packages
 
 # This is necessary to lookup pip with pip -e file. It also makes package_dir unnecessary
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "package"))
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
 setup(
     name='rosbag2torch',

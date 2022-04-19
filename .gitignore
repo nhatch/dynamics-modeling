@@ -14,6 +14,9 @@ temp/
 # IDE
 .vscode/
 
+# Yaml files related to bag files
+datasets/**/*.yaml
+
 # TensorBoard
 runs/
 
