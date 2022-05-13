@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 import rospy
@@ -7,9 +7,9 @@ import rospy
 
 class AbstractTransform(ABC):
     @abstractproperty
-    def topics(self) -> List[str]:
+    def topics(self) -> List[Set[str]]:
         """
-        An ordered list of topics which given callback can process.
+        An ordered list of sets of topics which given callback can process.
         """
         pass
 
@@ -23,12 +23,10 @@ class AbstractTransform(ABC):
     def __call__(self, *args, **kwargs):
         return self.callback(*args, **kwargs)
 
-    def __init__(self, features: List[str]):
-        self.required_features = features
-
     @abstractmethod
     def callback(
         self,
+        topic: str,
         msg,
         ts: rospy.Time,
         current_state: Dict[str, np.ndarray],

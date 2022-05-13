@@ -50,18 +50,21 @@ from rosbag2torch import SequenceLookaheadDataset
 
 # This assumes that code from previous section was run, and sequences is a variable.
 
-# SequenceLookaheadDataset is a Dataset that will take features at index t and look ahead for delayed features at time t + delay_steps.
-# Then it will do the same for indexes t + delay_steps and t + 2 * delay_steps, creating a sequence at timestamps:
-# t, t + delay_steps, t + 2 * delay_steps, ... of length sequence_length.
+# SequenceLookaheadDataset is a Dataset that will take features at index t + offset (specified for each feature separately).
+# Then it will form sequences of length sequence_length.
+# For the example below (if c is control, s is state, and t is target), it will form sequences:
+# [(c0, s3, t4), (c1, s4, t5), (c2, s4, t5), ...]
+# [(c1, s4, t5), (c2, s4, t5), (c3, s5, t6), ...]
+# NOTE: In the dataloader in few lines you will see that also time offsets for each feature are included.
 dataset = SequenceLookaheadDataset(
     # Result of load_bags call
     sequences,
-    # Features to get at time t.
-    features=["state", "control"],
-    # Features to get at time t + delay_steps
-    delayed_features=["target"],
-    # Number of steps to look ahead.
-    delay_steps=3,
+    # Features to get at time t + offset (specified as a second argument to the tuple).
+    features=[
+        ("control", 0),
+        ("state", 3),
+        ("target", 4),
+    ]
     # Size of each sequence
     sequence_length=100,
 )
@@ -71,9 +74,11 @@ from torch.utils.data import DataLoader
 
 # Dataset will yield a tuple that contains:
 #   - all of features (in order given to constructor)
-#   - all of delayed features (in order given to constructor)
-#   - The difference in time at which the delayed features and the features were logged.
-for state, control, target, dts in Dataloader(dataset):
+#   - the difference in time of the feature delay/offset and the "0" offset (the feature with the least delay).
+# NOTE: As a result of the above, at least one of the elements in the tuple will be always 0, which makes it useless.
+#       This approach however gives freedom when there are non-trivial delay relations between different sets of features.
+for control, _, state, state_delay, target, target_delay in Dataloader(dataset):
+    # In this case control_delay is always 0, so we just ignore it.
     pass
 ```
 
@@ -105,13 +110,16 @@ Lastly the scripts `src/main.py` combines all of these building blocks into one 
 
 
 ## TODOs
-- [ ] Fix other datasets to follow SequenceLookaheadDataset __get_item__ structure.
-- [ ] Invoke tasks for linting and testing(? See below)
+- [ ] Utility to loop over .h5cache files along with bags.
+- [ ] Test & Invoke tasks for testing
+- [ ] Decouple looking up transforms when extracting features in reader.
 - [ ] Move to GitLab
 - [ ] Dask support for arrays bigger than memory? I don't think it will be an issue with dynamics-modeling (unless we do some stuff with elevation map), but it might be useful for other extractions.
 
 ### Old TODOs
+- [x] Register hook for transforms
 - [x] Make validation/plotting pipeline.
+- [x] Fix other datasets to follow SequenceLookaheadDataset __get_item__ structure.
 - [x] Debug of current differential pose approach, and figuring out sync issues.
 - [x] Verify that robot type argument is even necessary. If it is then make sure it's properly passed into data loading, models etc.
 - [x] Add support for AutoRally style input/output.

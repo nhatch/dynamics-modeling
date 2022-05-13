@@ -269,8 +269,15 @@ class AbstractSequenceReader(ABC):
         robot_name = topic_parents[np.argmax(topic_parents_counts)]
 
         topics_with_transforms = get_topics_and_transforms(
-            self.required_keys, set(topics.keys()), {"robot_name": robot_name}
+            bag_topics=set(topics.keys()),
+            format_map={"robot_name": robot_name},
+            features=self.required_keys,
         )
+        if topics_with_transforms is None:
+            print(
+                f"Failed to get transforms for requested features that also match topics included in bag {bag_file_path}."
+            )
+            return
 
         if self.filters == []:
             filtered_ts = [
@@ -329,7 +336,7 @@ class AbstractSequenceReader(ABC):
             ):
                 # Callback for current topic
                 for transform in topics_with_transforms[topic]:
-                    transform.callback(msg, ts, current_state)
+                    transform.callback(topic, msg, ts, current_state)
 
             for transform in transforms:
                 self.cur_raw_sequence[transform.feature] = transform.end_sequence()

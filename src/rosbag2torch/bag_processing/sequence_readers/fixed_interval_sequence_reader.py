@@ -16,7 +16,7 @@ class FixedIntervalReader(AbstractSequenceReader):
         spline_pwr: int = 3,
         filters: List[AbstractFilter] = [],
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(required_keys, filters, *args, **kwargs)
 
@@ -32,11 +32,13 @@ class FixedIntervalReader(AbstractSequenceReader):
         for raw_sequence in self.cur_bag_raw_sequences:
             min_ts, max_ts = None, None
             is_empty_sequence = False
+            missing_features = set()
             for feature_name in self.required_keys:
                 # Sequence is empty
                 if len(raw_sequence[feature_name][0]) <= 2:
                     is_empty_sequence = True
-                    break
+                    missing_features.add(feature_name)
+                    continue
 
                 if min_ts is None or raw_sequence[feature_name][1][0] < min_ts:
                     min_ts = raw_sequence[feature_name][1][0]
@@ -45,6 +47,7 @@ class FixedIntervalReader(AbstractSequenceReader):
 
             # Empty sequence break
             if is_empty_sequence:
+                print(f"Empty sequence. Missing features {missing_features}")
                 break
 
             # Goal timestamps (that sequence is actually logged on)

@@ -1,47 +1,55 @@
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple, Union, cast
 
 import numpy as np
 import rospy
 
-from ..msg_stubs import AutomaticGearDirectionDict, VehicleInput
+from ..msg_stubs import AutomaticGearDirectionDict, VehicleInput, VehicleState
 from .abstract_transform import AbstractTransform
 
 
 class InputTransform(AbstractTransform):
-    topics = ["/{robot_name}/input"]
+    topics = [{"/{robot_name}/input", "/{robot_name}/vehicle"}]
     feature = "control"
 
     THRESHOLD_NEW_SEQUENCE = (
         0.15  # seconds. Time after which a new sequence is started.
     )
 
-    def __init__(self, features):
-        super().__init__(features)
-        self.required_features_set = set(
-            self.required_features
-        )  # This is to speed up check in the beggining of callback. It will run often
+    def __init__(self):
+        super().__init__()
+        self.__last_known_gear: Optional[int] = None
 
         self.end_bag()
 
     def callback(
         self,
-        msg: VehicleInput,
+        topic: str,
+        msg: Union[VehicleInput, VehicleState],
         ts: rospy.Time,
         current_state: Dict[str, np.ndarray],
         *args,
         **kwargs,
     ):
-        state = [
-            msg.steer * AutomaticGearDirectionDict[msg.automatic_gear],
-            msg.throttle * AutomaticGearDirectionDict[msg.automatic_gear],
-            msg.brake,
-        ]
+        if topic.endswith("input"):
+            msg = cast(VehicleInput, msg)
 
-        # Add vehicle input information to the current state.
-        current_state[self.__class__.feature] = np.array(state)
+            if self.__last_known_gear is None:
+                return
 
-        self.state_history.append(state)
-        self.ts_history.append(ts.to_sec())
+            state = [
+                msg.throttle * AutomaticGearDirectionDict[self.__last_known_gear],
+                msg.brake,
+                msg.steer * AutomaticGearDirectionDict[self.__last_known_gear],
+            ]
+
+            # Add vehicle input information to the current state.
+            current_state[self.__class__.feature] = np.array(state)
+
+            self.state_history.append(state)
+            self.ts_history.append(ts.to_sec())
+        elif topic.endswith("vehicle"):
+            msg = cast(VehicleState, msg)
+            self.__last_known_gear = msg.gearbox_mode
 
     def end_sequence(self) -> Tuple[np.ndarray, np.ndarray]:
         states = np.array(self.state_history)

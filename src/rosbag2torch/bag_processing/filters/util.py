@@ -31,3 +31,33 @@ def get_filters_topics(
             )
 
     return result
+
+
+def flip_filter(filter_: AbstractFilter) -> AbstractFilter:
+    """
+    Given a filter, return a new filter that is the same as the original, but with should_log flipped.
+    """
+
+    class FlipFilter(AbstractFilter):
+        def __init__(self, filter_: AbstractFilter):
+            self.filter_ = filter_
+            self._msg_received = False
+
+        @property
+        def topics(self) -> List[Set[str]]:
+            return self.filter_.topics
+
+        def callback(self, msg, ts, topic):
+            self._msg_received = True
+            self.filter_.callback(msg, ts, topic)
+
+        def end_bag(self):
+            self.filter_.end_bag()
+
+        @property
+        def should_log(self) -> bool:
+            if not self._msg_received:
+                return False
+            return not self.filter_.should_log
+
+    return FlipFilter(filter_)
