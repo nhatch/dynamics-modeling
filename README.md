@@ -1,6 +1,11 @@
 # dynamics-modeling
 This repo deals with machine learning (ML) for dynamics models for the RZR (and Warthog? (TODO: Verify it works for Warthog bags too)) vehicles in simulation and on the real vehicles.
 
+It is split into two parts:
+
+1. rosbag2torch - a general purpose library that converts rosbags to torch datasets.
+2. examples/dynamics_modeling - a collection of examples that use the library to train dynamics modeling models.
+
 ## Installation
 
 ```
@@ -9,12 +14,15 @@ cd dynamics-modeling
 pip install .
 ```
 
-## Usage
-Example usage files are in the `examples` folder.
+## rosbag2torch
+
+
+### Usage
+More usage examples files are in the `examples` folder.
 
 Below is a list of features that rosbag2torch provides
 
-### Reading bag files into sequences
+#### Reading bag files into sequences
 ```python
 from rosbag2torch import load_bags, readers, filters, transforms
 
@@ -44,7 +52,7 @@ sequences = load_bags("path_to_folder_with_bags", reader)
 # This can be useful if you have separate folders for train and validation sets.
 ```
 
-### Converting sequences into Dataset
+#### Converting sequences into Dataset
 ```python
 from rosbag2torch import SequenceLookaheadDataset
 
@@ -81,6 +89,29 @@ for control, _, state, state_delay, target, target_delay in Dataloader(dataset):
     # In this case control_delay is always 0, so we just ignore it.
     pass
 ```
+
+## Examples/Dynamics Modeling
+As of time of writing there are 4 runnable files in the *examples* folder.
+They all train a model that is given a control (throttle, brake, steer) and state (dx, dtheta) and predicts the acceleration (ddx, ddtheta).
+Target values (y's in ML) are given as (dx, dtheta) after some time dt (also provided).
+However, they all use different approaches to training these models:
+
+1. *hidden2relu* - For each time step, the model takes the state and control and predicts the acceleration.
+   It then applies this acceleration to get the state after some dt. Loss is defined between this predicted state and the target state.
+2. *sequence_model* - Similar to *hidden2relu*, but applies the model to a sequence of controls, and a start state.
+   It then predicts the acceleration, which is used to predict the state after some dt. That state is fed back into a model, creating a rollout of states/controls.
+   Loss is defined for at each point of the rollout with corresponding target state.
+3. *hyperparameter_search_sequence_model* - Similar to *sequence_model*, but uses a hyperparameter search to find the best model.
+4. *xy_hyperparameter_search_sequence_model* - Same as *hyperparameter_search_sequence_model*, but with different loss definition.
+   Rather than defining loss in space (dx, dtheta) it rolls out these values in (x, y, theta) space and defines loss on top of these.
+
+Both of the hyperparameter search scripts use [tensorboard](https://www.tensorflow.org/tensorboard/) to log the results.
+
+There are also additional scripts:
+
+* example_utils - a collection of functions that are used in the examples. This is mainly used because there is a lot of code overlap between all sequence scripts.
+* look_at_dists - A script that can be used to look at the distribution of the training data.
+* unit_tests - Script that can perform some controlled tests given a scripted model. TODO: These should not be here I think. Ideally we should just have tests folder for dynamics modeling.
 
 ## Development
 From this point on-ward are instructions and other resources for the development.
