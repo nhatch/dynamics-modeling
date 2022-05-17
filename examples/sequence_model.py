@@ -103,6 +103,7 @@ def train(
             dts = target_dts - states_dts
             # Convert to FloatTensor
             controls, states, targets, dts = controls.float(), states.float(), targets.float(), dts.float()
+            batch_size = batch[0].shape[0]
 
             # Zero-out the gradient
             optimizer.zero_grad()
@@ -121,7 +122,7 @@ def train(
             for rollout_idx, (pred, target) in enumerate(zip(predictions, targets.transpose(0, 1))):
                 loss = criterion(pred, target)
                 rollout_losses.append(loss)
-                running_loss_rollout_steps[rollout_idx] += loss.detach().cpu().item()
+                running_loss_rollout_steps[rollout_idx] += batch_size*loss.detach().cpu().item()
 
             # Total loss is the sum of the losses at each trajectory point
             loss = sum(rollout_losses)
@@ -131,7 +132,7 @@ def train(
             optimizer.step()
 
             # Log loss
-            running_total_loss += loss.detach().cpu().item()
+            running_total_loss += batch_size*loss.detach().cpu().item()
 
             # Repeat for baseline model
             with torch.no_grad():
@@ -150,19 +151,19 @@ def train(
 
                     # Total loss is the sum of the losses at each trajectory point
                     baseline_loss = sum(baseline_rollout_losses)
-                    running_baseline_loss += baseline_loss.detach().cpu().item()
+                    running_baseline_loss += batch_size*baseline_loss.detach().cpu().item()
 
         # Run zero_grad at the end of each epoch, just in case
         optimizer.zero_grad()
 
-        train_loss = running_total_loss / len(train_loader)
-        train_baseline_loss = running_baseline_loss / len(train_loader)
+        train_loss = running_total_loss / len(train_loader.dataset)
+        train_baseline_loss = running_baseline_loss / len(train_loader.dataset)
         if writer is not None:
             writer.add_scalar("Loss/train total", train_loss, epoch)
             if model_baseline is not None:
                 writer.add_scalar("Loss/train total baseline", train_baseline_loss, epoch)
             for rollout_idx, rollout_loss in running_loss_rollout_steps.items():
-                writer.add_scalar(f"Loss/train @ rollout step {rollout_idx}", rollout_loss / len(train_loader), epoch)
+                writer.add_scalar(f"Loss/train @ rollout step {rollout_idx}", rollout_loss / len(train_loader.dataset), epoch)
         desc = f"Epochs Train Loss {train_loss:.4g} Baseline {train_baseline_loss:.4g}"
 
         if val_loader is not None:
@@ -176,6 +177,7 @@ def train(
                     controls, _, states, states_dts, targets, target_dts = batch
                     dts = target_dts - states_dts
                     controls, states, targets, dts = controls.float(), states.float(), targets.float(), dts.float()
+                    batch_size = batch[0].shape[0]
 
                     # Forward pass - Unroll the trajectory
                     predictions = unroll_sequence_torch(
@@ -190,10 +192,10 @@ def train(
                     for rollout_idx, (pred, target) in enumerate(zip(predictions, targets.transpose(0, 1))):
                         loss = criterion(pred, target)
                         rollout_losses.append(loss)
-                        running_loss_rollout_steps[rollout_idx] += loss.detach().cpu().item()
+                        running_loss_rollout_steps[rollout_idx] += batch_size*loss.detach().cpu().item()
 
                     loss = sum(rollout_losses)
-                    running_loss += loss.detach().cpu().item()
+                    running_loss += batch_size*loss.detach().cpu().item()
 
                     # Repeat for baseline model
                     if model_baseline is not None:
@@ -211,17 +213,17 @@ def train(
 
                         # Total loss is the sum of the losses at each trajectory point
                         baseline_loss = sum(baseline_rollout_losses)
-                        running_baseline_loss += baseline_loss.detach().cpu().item()
+                        running_baseline_loss += batch_size*baseline_loss.detach().cpu().item()
 
 
-                val_loss = running_loss / len(val_loader)
-                val_baseline_loss = running_baseline_loss / len(val_loader)
+                val_loss = running_loss / len(val_loader.dataset)
+                val_baseline_loss = running_baseline_loss / len(val_loader.dataset)
                 if writer is not None:
                     writer.add_scalar("Loss/val total", val_loss, epoch)
                     if model_baseline is not None:
                         writer.add_scalar("Loss/val total baseline", val_baseline_loss, epoch)
                     for rollout_idx, rollout_loss in running_loss_rollout_steps.items():
-                        writer.add_scalar(f"Loss/val @ rollout step {rollout_idx}", rollout_loss / len(val_loader), epoch)
+                        writer.add_scalar(f"Loss/val @ rollout step {rollout_idx}", rollout_loss / len(val_loader.dataset), epoch)
                 desc += f" Val Loss {val_loss:.4g} Baseline {val_baseline_loss:.4g}"
 
         trange_epochs.set_description(desc)
@@ -311,7 +313,7 @@ def main():
 
     # Sequence/Data Parameters
     DELAY_STEPS = 3  # indices
-    ROLLOUT_S = 5  # seconds
+    ROLLOUT_S = 1  # seconds
 
     # Model Parameters
     ACTIVATION_FN = nn.SELU()
@@ -328,6 +330,7 @@ def main():
 
     # Suffix to use for saving this configuration. Shared for tensorboard and models
     settings_suffix = f"delay_{DELAY_STEPS}_rollout_{ROLLOUT_S}s_hidden_{HIDDEN_SIZE}_layers_{NUM_HIDDEN_LAYERS}_activation_{ACTIVATION_FN.__class__.__name__}_lr_{LR:.2e}_bs_{BATCH_SIZE}_epochs_{EPOCHS}"
+    model_suffix = f"real_forwards_{settings_suffix}"
 
     # What features to read.
     # NOTE: Values corresponding to these (and their ordering) are hardcoded in the model and train loop. Changing them here will break the code.
@@ -351,15 +354,7 @@ def main():
         log_interval=1.0 / log_hz,
         filters=[
             filters.ForwardFilter(),
-            filters.PIDInfoFilter()
-        ]
-    )
-    train_reader = readers.FixedIntervalReader(
-        list(set(features + delayed_features)),
-        log_interval=1.0 / log_hz,
-        filters=[
-            filters.ForwardFilter(),
-            filters.PIDInfoFilter()
+            filters.PIDInfoFilter(),
         ]
     )
     rollout_len = int(ROLLOUT_S  * log_hz)
@@ -368,12 +363,12 @@ def main():
     val_dataset = SequenceLookaheadDataset(
         val_sequences, [("control", 0), ("state", 3), ("target", 4)], sequence_length=rollout_len
     )
-    train_sequences = load_bags(DATASET_TRAIN, train_reader)
+    train_sequences = load_bags(DATASET_TRAIN, reader)
     train_dataset = SequenceLookaheadDataset(
         train_sequences, [("control", 0), ("state", 3), ("target", 4)], sequence_length=rollout_len
     )
 
-    model_prefix = f"models/sequence_model_{settings_suffix}"
+    model_prefix = f"models/sequence_model_{model_suffix}"
     if not Path(model_prefix).parent.exists():
         Path(model_prefix).parent.mkdir(parents=True)
 
@@ -382,7 +377,7 @@ def main():
         optimizer = optim.Adam(model.parameters(), weight_decay=0.01, lr=LR)
         criterion = nn.MSELoss()
 
-        writer = SummaryWriter(log_dir=f"runs/sequence_model_{settings_suffix}_{datetime.now().strftime('%b%d_%H-%M-%S')}")
+        writer = SummaryWriter(log_dir=f"runs/sequence_model_{model_suffix}_{datetime.now().strftime('%b%d_%H-%M-%S')}")
 
         train(
             model=model,
@@ -423,7 +418,7 @@ def main():
             plt.ylabel("y")
             if not os.path.exists("plots"):
                 os.makedirs("plots")
-            plt.savefig(f"plots/sequence_model_train_{settings_suffix}.png", bbox_inches="tight")
+            plt.savefig(f"plots/sequence_model_train_{model_suffix}.png", bbox_inches="tight")
             plt.show()
 
     if PLOT_VAL:
@@ -433,7 +428,7 @@ def main():
                 model.load_state_dict(torch.load(f"{model_prefix}_state_dict.pt"))
             model.eval()
 
-            controls, _, states, states_dts, targets, target_dts = train_dataset.longest_rollout
+            controls, _, states, states_dts, targets, target_dts = val_dataset.longest_rollout
             dts = target_dts - states_dts
             poses_true, start_poses, poses_pred_all = get_world_frame_rollouts(model, states, controls, dts, rollout_in_seconds=ROLLOUT_S)
 
@@ -450,7 +445,7 @@ def main():
             plt.ylabel("y")
             if not os.path.exists("plots"):
                 os.makedirs("plots")
-            plt.savefig(f"plots/sequence_model_val_{settings_suffix}.png", bbox_inches="tight")
+            plt.savefig(f"plots/sequence_model_val_{model_suffix}.png", bbox_inches="tight")
             plt.show()
 
 if __name__ == "__main__":

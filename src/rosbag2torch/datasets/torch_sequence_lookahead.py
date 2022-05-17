@@ -38,6 +38,11 @@ class SequenceLookaheadDataset(Dataset):
         self.__sequence_start_idxs = np.cumsum([0] + self.__sequence_lengths[:-1])
         # Total number of rollouts in all sequences
         self.__total_len = sum(self.__sequence_lengths)
+        seq_len_string = "+".join(map(lambda i: str(i), self.__sequence_lengths))
+        print(f"Constructed dataset of size {self.__total_len} ({seq_len_string})")
+        if self.__total_len == 0:
+            print("ERROR: empty dataset")
+            from IPython import embed; embed()
 
     def __len__(self) -> int:
         """Number of rollouts/sequences in this dataset.

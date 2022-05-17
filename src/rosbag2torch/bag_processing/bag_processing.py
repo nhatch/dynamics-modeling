@@ -17,10 +17,20 @@ def load_bags(
         Sequences: A list of sequences (each is a dictionary) extracted from the bag files.
             Note that one bag may contain any number of sequences (0, 1, or more).
     """
-    for file_path in Path(data_folder).rglob("*.bag"):
+    p = Path(data_folder)
+    if not p.is_dir():
+        raise NotADirectoryError("{} is not a directory".format(data_folder))
+
+    for file_path in p.rglob("*.bag"):
         reader.extract_bag_data(file_path)
 
     sequences = reader.sequences
     reader.reset()
+
+    if len(sequences) == 0:
+        print("Warning: reader found no sequences in {}".format(data_folder))
+    else:
+        print("Found {} sequences of len {}".format(
+            len(sequences), list(map(lambda s: len(s["time"]), sequences))))
 
     return sequences

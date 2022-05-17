@@ -85,7 +85,7 @@ from torch.utils.data import DataLoader
 #   - the difference in time of the feature delay/offset and the "0" offset (the feature with the least delay).
 # NOTE: As a result of the above, at least one of the elements in the tuple will be always 0, which makes it useless.
 #       This approach however gives freedom when there are non-trivial delay relations between different sets of features.
-for control, _, state, state_delay, target, target_delay in Dataloader(dataset):
+for control, _, state, state_delay, target, target_delay in DataLoader(dataset):
     # In this case control_delay is always 0, so we just ignore it.
     pass
 ```
