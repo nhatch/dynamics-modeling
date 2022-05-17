@@ -37,9 +37,10 @@ class InputTransform(AbstractTransform):
                 return
 
             state = [
-                msg.throttle * AutomaticGearDirectionDict[self.__last_known_gear],
+                # msg.throttle * AutomaticGearDirectionDict[self.__last_known_gear],
+                msg.throttle,
                 msg.brake,
-                msg.steer * AutomaticGearDirectionDict[self.__last_known_gear],
+                msg.steer,
             ]
 
             # Add vehicle input information to the current state.
