@@ -142,12 +142,17 @@ Lastly the scripts `src/main.py` combines all of these building blocks into one 
 
 ## TODOs
 - [ ] Utility to loop over .h5cache files along with bags.
-- [ ] Test & Invoke tasks for testing
 - [ ] Decouple looking up transforms when extracting features in reader.
 - [ ] Move to GitLab
+- [ ] Investigate GIFs in tensorboard. It [seems](https://github.com/tensorflow/tensorboard/issues/39#issuecomment-568917607) that they can be added locally.
+- [ ] Figure out how to share run logs with other people. Setting up a server on CSE network could be helpful in long run.
+- [ ] Learn how to properly use HParams.
+- [ ] Simpler, non-dynamics modeling oriented examples?
+- [ ] Check if there are memeory issues with images in rosbag2torch. If there are implement sequences with a optional callback to load an element.
 - [ ] Dask support for arrays bigger than memory? I don't think it will be an issue with dynamics-modeling (unless we do some stuff with elevation map), but it might be useful for other extractions.
 
 ### Old TODOs
+- [x] Test & Invoke tasks for testing
 - [x] Register hook for transforms
 - [x] Make validation/plotting pipeline.
 - [x] Fix other datasets to follow SequenceLookaheadDataset __get_item__ structure.
